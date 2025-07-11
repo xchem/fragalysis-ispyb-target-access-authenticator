@@ -4,11 +4,13 @@ import json
 import logging
 import os
 from logging.config import dictConfig
-from typing import Any
+from typing import Annotated, Any
 from urllib.parse import quote
 
 from fastapi import (
     FastAPI,
+    Header,
+    HTTPException,
     status,
 )
 from pydantic import BaseModel
@@ -52,9 +54,14 @@ def _json_deserialiser(key, value, flags):
     assert False
 
 
+# Our Query Key?
+# One that must be provided by clients (via the header) when querying.
+_QUERY_KEY: str = os.getenv("TAA_QUERY_KEY", "")
+assert _QUERY_KEY
+
 # The location is either a host ("localhost") or host and port ("localhost:1234").
 # If the port is not the expected default of 11211 is assumed.
-_MEMCACHED_LOCATION: str = os.getenv("TAA_MEMCACHED_LOCATION", "memcached")
+_MEMCACHED_LOCATION: str = os.getenv("TAA_MEMCACHED_LOCATION", "localhost")
 _MEMCACHED_KEEPALIVE: KeepaliveOpts = KeepaliveOpts(idle=35, intvl=8, cnt=5)
 _MEMCACHED_BASE_CLIENT: Client = Client(
     _MEMCACHED_LOCATION,
@@ -114,8 +121,20 @@ def get_taa_version() -> TargetAccessGetVersionResponse:
 
 
 @app.get("/target-access/{username}", status_code=status.HTTP_200_OK)
-def get_taa_user_tas(username: str):
-    """Returns the list of target access strings for a user."""
+def get_taa_user_tas(
+    username: str,
+    x_taaquerykey: Annotated[str | None, Header()] = None,
+):
+    """Returns the list of target access strings for a user.
+    the user must provide a valid 'query key' - the one we've been
+    configured with.
+    """
+    # Must not continue unless the correct query key has been provided.
+    if x_taaquerykey != _QUERY_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid/missing X_TAAQueryKey",
+        )
 
     # FastAPI decodes url-encoded strings and memcached keys cannot contain spaces
     # so we need to re-encode the username for cache lookup.

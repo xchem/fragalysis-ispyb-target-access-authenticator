@@ -17,7 +17,8 @@ services:
     image: xchem/fragalysis-ispyb-target-access-authenticator:latest
     container_name: taa
     environment:
-      ESS_MEMCACHED_LOCATION: memcached
+      TAA_QUERY_KEY: blob1234
+      TAA_MEMCACHED_LOCATION: memcached
     ports:
     - '8080:8080'
     depends_on:
