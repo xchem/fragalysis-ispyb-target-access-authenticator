@@ -14,7 +14,7 @@ services:
   taa:
     build:
       context: .
-    image: xchem/fragalysis-ispyb-target-access-authenticatior:latest
+    image: xchem/fragalysis-ispyb-target-access-authenticator:latest
     container_name: taa
     environment:
       ESS_MEMCACHED_LOCATION: memcached

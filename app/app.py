@@ -5,6 +5,7 @@ import logging
 import os
 from logging.config import dictConfig
 from typing import Any
+from urllib.parse import quote
 
 from fastapi import (
     FastAPI,
@@ -31,9 +32,29 @@ _LOGGER = logging.getLogger(__name__)
 app = FastAPI()
 
 # Configure memcached.
+
+
+# We use custom serialisers to convert our list of strings
+# to/from a string (which is the memcached native value type).
+# Memcached value size if limited to 1MB - about 90_000 TAS strings?
+def _json_serialiser(key, value):
+    del key
+    return (value, 1) if isinstance(value, str) else (json.dumps(value), 2)
+
+
+def _json_deserialiser(key, value, flags):
+    del key
+    if flags == 1:
+        return value
+    if flags == 2:
+        return json.loads(value)
+    # How did we get here?
+    assert False
+
+
 # The location is either a host ("localhost") or host and port ("localhost:1234").
 # If the port is not the expected default of 11211 is assumed.
-_MEMCACHED_LOCATION: str = os.getenv("TAA_MEMCACHED_LOCATION", "localhost")
+_MEMCACHED_LOCATION: str = os.getenv("TAA_MEMCACHED_LOCATION", "memcached")
 _MEMCACHED_KEEPALIVE: KeepaliveOpts = KeepaliveOpts(idle=35, intvl=8, cnt=5)
 _MEMCACHED_BASE_CLIENT: Client = Client(
     _MEMCACHED_LOCATION,
@@ -41,6 +62,8 @@ _MEMCACHED_BASE_CLIENT: Client = Client(
     encoding="utf-8",
     timeout=0.5,
     socket_keepalive=_MEMCACHED_KEEPALIVE,
+    serializer=_json_serialiser,
+    deserializer=_json_deserialiser,
 )
 _MEMCACHED_CLIENT: RetryingClient = RetryingClient(
     _MEMCACHED_BASE_CLIENT,
@@ -49,6 +72,10 @@ _MEMCACHED_CLIENT: RetryingClient = RetryingClient(
     retry_for=[MemcacheUnexpectedCloseError],
 )
 
+# Some mock data
+_MEMCACHED_CLIENT.set("dave%20lister", ["sb-99999"])
+
+# Get our version (from the 'VERSION' file)
 with open("VERSION", "r", encoding="utf-8") as version_file:
     _VERSION: str = version_file.read().strip()
 
@@ -89,9 +116,17 @@ def get_taa_version() -> TargetAccessGetVersionResponse:
 @app.get("/target-access/{username}", status_code=status.HTTP_200_OK)
 def get_taa_user_tas(username: str):
     """Returns the list of target access strings for a user."""
-    _LOGGER.info("Request for '%s'", username)
-    _ = _MEMCACHED_CLIENT.get(username)
+
+    # FastAPI decodes url-encoded strings and memcached keys cannot contain spaces
+    # so we need to re-encode the username for cache lookup.
+    encoded_username: str = quote(username)
+    cache = _MEMCACHED_CLIENT.get(encoded_username)
+    tas_list: list[str] = cache if cache is not None else []
+
+    count: int = len(tas_list)
+    _LOGGER.info("Request for '%s' (count=%s)", username, count)
+
     return TargetAccessGetUserTasResponse(
-        count=0,
-        target_access=[],
+        count=count,
+        target_access=tas_list,
     )
