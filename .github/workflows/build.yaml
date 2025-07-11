@@ -18,8 +18,10 @@ name: build
 
 on:
   push:
-    tags-ignore:
-    - '**'
+  schedule:
+  # Build every Sunday (0) at 4:30pm
+  - cron: '30 16 * * 0'
+
 
 env:
   # The following 'defaults' are used in the 'Initialise workflow variables' step,
