@@ -56,6 +56,11 @@ that are not known: -
 }
 ```
 
+>   For a query to be successful the client must provide a `X_TAAQueryKey` header value
+    that matches the `TAA_QUERY_KEY` environment value supplied to the image.
+    This proves a crude but effective security mechanism that prevents queries without
+    providing a pre-defined key.
+
 ## Contributing
 The project uses: -
 
