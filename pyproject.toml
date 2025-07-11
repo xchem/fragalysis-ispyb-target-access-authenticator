@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "fragalysis-ispyb-target-access-authenticator"
+version = "0.1.0"
+package-mode = false
+description = "The Fragalysis Stack Python/FastAPI ISPyB Target Access Authenticator"
+authors = ["Alan Christie <achristie@einformaticsmatters.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+# Locked versions (for now)
+fastapi = "0.115.8"
+uvicorn = {extras = ["standard"], version = "^0.34.0"}
+# Flexible versions
+pymemcache = "^4.0.0"
+pydantic = "^2.10.6"
+python = "^3.12"
+
+[tool.poetry.group.dev.dependencies]
+pre-commit = "^4.2.0"
+pylint = "^3.3.7"
+httpie = "^3.2.4"
+isort = "^6.0.1"
+black = "^25.1.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
