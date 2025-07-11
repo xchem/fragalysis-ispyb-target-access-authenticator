@@ -22,6 +22,9 @@ httpie = "^3.2.4"
 isort = "^6.0.1"
 black = "^25.1.0"
 
+[tool.pylint.'MESSAGES CONTROL']
+disable = "too-few-public-methods"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
