@@ -1,2 +1,56 @@
-# fragalysis-target-access-authenticator
-An image used for Fragalysis Target Access Authentication
+# The Fragalysis ISPyB Target Access Authenticator
+
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/xchem/fragalysis-target-access-authenticator)
+
+[![build](https://github.com/xchem/fragalysis-target-access-authenticator/actions/workflows/build.yaml/badge.svg)](https://github.com/xchem/fragalysis-target-access-authenticator/actions/workflows/build.yaml)
+
+[![License](http://img.shields.io/badge/license-Apache%202.0-blue.svg?style=flat)](https://github.com/xchem/fragalysis-target-access-authenticator/blob/master/LICENSE.txt)
+
+[![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg)](https://conventionalcommits.org)
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
+[![Packaged with Poetry](https://img.shields.io/badge/packaging-poetry-cyan.svg)](https://python-poetry.org/)
+
+The ISPyB authenticator provides the Fragalysis Stack with a centralised service that
+can be utilised bny any number of stacks, and yields Target Access Strings based on User.
+It essentially replaces the stack internal **security** modules's ISPyB query mechanism.
+
+The service is deployed into Kubernetes, typically in its own Namespace, along
+with a Service definition to allow in-cluster queries. By extracting the security
+logic from the Stack administrators can deploy custom authentication implementations
+using services other than ISPyB. For example you may control Target Access from
+PostgreSQL database. If so, you simply have to deploy your own access implementation -
+all it has to do is provide the same service. The choice of authentication
+implementation is yours. You could for example  deploy a _dummy_ service for testing that
+has a built-in (hard-coded) set of Target Access strings and users and it allows
+you to develop locally (offline) without needing to connect to any _real_
+underlying service.
+
+Any service implementation can be deployed, this one provides access to ISPyB.
+
+The authentication logic's _contract_ requires the following endpoints: -
+
+-   `/version` **GET**
+
+That returns the following properties, each value being a string ina **200** response: -
+
+```json
+{
+  "version": "1.0.0",
+  "kind": "ISPYB",
+  "name": "XChem ISPyB Authenticator"
+}
+```
+
+A stack requests Target Access Strings based on URL-encoded username strings,
+and returns an arrays of strings in a **200** response and a **404** for usernames
+that are not known: -
+
+-   `/target-access/{username}` **GET**
+
+```json
+{
+  "target_access": [ "lb-00000", "lb-000001" ]
+}
+```
+
+---
