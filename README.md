@@ -51,6 +51,7 @@ that are not known: -
 
 ```json
 {
+  "count": 2,
   "target_access": [ "lb-00000", "lb-000001" ]
 }
 ```

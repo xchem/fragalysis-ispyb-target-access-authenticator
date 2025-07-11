@@ -1,5 +1,5 @@
 ---
-name: build dev
+name: build
 
 # Actions that take place after every commit that's not on either the
 # staging ore production branches.
@@ -19,7 +19,7 @@ name: build dev
 on:
   push:
     tags-ignore:
-      - '**'
+    - '**'
 
 env:
   # The following 'defaults' are used in the 'Initialise workflow variables' step,
@@ -35,11 +35,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Inject slug/short variables
-        uses: rlespinasse/github-slug-action@v5
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Build
-        uses: docker/build-push-action@v6
-        with:
-          tags: xchem/fragalysis-ispyb-target-access-authenticator:latest
+    - name: Inject slug/short variables
+      uses: rlespinasse/github-slug-action@v5
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Build
+      uses: docker/build-push-action@v6
+      with:
+        tags: xchem/fragalysis-ispyb-target-access-authenticator:latest
