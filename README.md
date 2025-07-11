@@ -32,7 +32,7 @@ The authentication logic's _contract_ requires the following endpoints: -
 
 -   `/version` **GET**
 
-That returns the following properties, each value being a string ina **200** response: -
+That returns the following properties, each value being a string in a **200** response: -
 
 ```json
 {
