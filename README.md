@@ -80,6 +80,14 @@ current health of your clone with: -
 
     pre-commit run --all-files
 
+## Local development
+You can build and launch the code using the `docker-compose.yml` file.
+and make requests to the service via `http:8080/version`
+and `http:8080/target-access/dave%20lister`: -
+
+    docker compose build
+    docker compose up
+
 ---
 
 [black]: https://black.readthedocs.io/en/stable
