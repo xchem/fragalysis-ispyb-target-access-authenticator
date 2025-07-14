@@ -85,8 +85,7 @@ current health of your clone with: -
 
     pre-commit run --all-files
 
-
-## Design
+## Design
 The ISPyB Target Access Authenticator (the TAA) provides responses to **GETS** from the
 `/target-access/{username}` endpoint that is a list of **Proposals** and **Visits**
 (e.g. `lb-00000-0`). These are used by the Diamond Light Source Fragalysis Stack to
