@@ -19,6 +19,7 @@ services:
     environment:
       TAA_QUERY_KEY: blob1234
       TAA_MEMCACHED_LOCATION: memcached
+      TAA_CACHE_EXPIRY_MINUTES: 2
     ports:
     - '8080:8080'
     depends_on:

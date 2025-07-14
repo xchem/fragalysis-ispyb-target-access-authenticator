@@ -100,7 +100,7 @@ def _utc_now() -> datetime:
 
 # Inject some mock data for "dave lister".
 _DUMMY_USER: str = quote("dave lister")
-_MEMCACHED_CLIENT.set(_DUMMY_USER, ["sb-99999"])
+_MEMCACHED_CLIENT.set(_DUMMY_USER, ["sb99999-9"])
 _MEMCACHED_CLIENT.set(f"{_TIMESTAMP_KEY_PREFIX}{_DUMMY_USER}", _utc_now())
 
 # Do we have a connector configured?

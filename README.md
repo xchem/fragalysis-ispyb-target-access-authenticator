@@ -52,7 +52,7 @@ that are not known: -
 ```json
 {
   "count": 2,
-  "target_access": [ "lb-00000", "lb-000001" ]
+  "target_access": [ "lb00000-1", "lb000001-1" ]
 }
 ```
 
@@ -88,30 +88,30 @@ current health of your clone with: -
 ## Design
 The ISPyB Target Access Authenticator (the TAA) provides responses to **GETS** from the
 `/target-access/{username}` endpoint that is a list of **Proposals** and **Visits**
-(e.g. `lb-00000-0`). These are used by the Diamond Light Source Fragalysis Stack to
+(e.g. `lb00000-0`). These are used by the Diamond Light Source Fragalysis Stack to
 authenticate a user's access to Targets. It does this my communicating with a
 remote MySQL database over SSH using credentials provided by the following container
 environment variables: -
 
--   ISPYB_HOST
--   ISPYB_PORT
--   ISPYB_USER
--   ISPYB_PASSWORD
--   SSH_HOST
--   SSH_USER
--   SSH_PASSWORD or SSH_PRIVATE_KEY_FILENAME
+-   TAA_ISPYB_HOST
+-   TAA_ISPYB_PORT
+-   TAA_ISPYB_USER
+-   TAA_ISPYB_PASSWORD
+-   TAA_SSH_HOST
+-   TAA_SSH_USER
+-   TAA_SSH_PASSWORD or TAA_SSH_PRIVATE_KEY_FILENAME
 
-If the SSH_PRIVATE_KEY_FILENAME is used (rather than SSH_PASSWORD) you are expected
+If the TAA_SSH_PRIVATE_KEY_FILENAME is used (rather than TAA_SSH_PASSWORD) you are expected
 to have mapped the SSH key file into the container.
 
-The TAA maintains a cache of collected target access strings using a co-located memcached
+The TAA maintains a cache of collected target access strings using a co-located [memcached]
 container. The content of the cache is always returned, while the TAA regularly
-tries to synchronise the cache with any result sis gets from the ISPyB database.
-The TAA attempts to communicate with the underlyign IPSyB database after the
-current data is considered to have expired (see **Rules** below). The expiry time
+tries to synchronise the cache with any results it gets from the ISPyB database.
+The TAA attempts to communicate with the underlying IPSyB database after the
+cache is considered to have expired (see **Rules** below). The expiry time
 is based on the number of minutes set in the following environment variable: -
 
--   CACHE_EXPIRY_MINUTES (default of 2)
+-   TAA_CACHE_EXPIRY_MINUTES (default of 2)
 
 The cache contains two records of information for each user: -
 
@@ -142,8 +142,8 @@ for the user is always returned in the `/target-access` API response.
 
 ## Local development
 You can build and launch the code using the `docker-compose.yml` file.
-and make requests to the service via `http:8080/version`
-and `http:8080/target-access/dave%20lister`: -
+and make requests to the service via `localhost:8080/version`
+and `localhost:8080/target-access/dave%20lister`: -
 
     docker compose up --build --detach
 
@@ -161,5 +161,6 @@ for the built-in test user with `httpie`: -
 [conventional commit]: https://www.conventionalcommits.org/en/v1.0.0/
 [fastapi]: https://fastapi.tiangolo.com
 [fragalysis-backend]: https://github.com/xchem/fragalysis-backend
+[memcached]: https://memcached.org
 [poetry]: https://python-poetry.org
 [pre-commit]: https://pre-commit.com
