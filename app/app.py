@@ -99,8 +99,7 @@ def _utc_now() -> datetime:
 
 
 # Inject some mock data for "dave lister".
-# Test data that expires after the configured cache period.
-_DUMMY_USER: str = "dave%20lister"
+_DUMMY_USER: str = quote("dave lister")
 _MEMCACHED_CLIENT.set(_DUMMY_USER, ["sb-99999"])
 _MEMCACHED_CLIENT.set(f"{_TIMESTAMP_KEY_PREFIX}{_DUMMY_USER}", _utc_now())
 
@@ -119,6 +118,9 @@ if Config.ISPYB_HOST:
     assert Config.SSH_PASSWORD or Config.SSH_PRIVATE_KEY_FILENAME
     # Create a connector
     _SSH_CONNECTOR = SSHConnector()
+    _LOGGER.info("Created SSHConnector(%s)", Config.SSH_HOST)
+else:
+    _LOGGER.warning("Insufficient configuration to query ISPyB")
 
 # Get our version (from the 'VERSION' file)
 with open("VERSION", "r", encoding="utf-8") as version_file:
@@ -181,22 +183,21 @@ def get_taa_user_tas(
 
     # Get cached user data and any related timestamp.
     user_timestamp_key: str = f"{_TIMESTAMP_KEY_PREFIX}{encoded_username}"
-    user_cache: list[str] | None = _MEMCACHED_CLIENT.get(encoded_username)
+    user_cache: list[str] = _MEMCACHED_CLIENT.get(encoded_username) or []
     user_cache_timestamp: datetime | None = _MEMCACHED_CLIENT.get(user_timestamp_key)
 
-    # If the user's cache record is too (or there is no cache timestamp)
-    # old then refresh the cache from the ISPyB DB.
+    # If the user's cache is empty or the cache record is too old
+    # (or there is no cache timestamp) then refresh the cache from the ISPyB DB.
     utc_now: datetime = _utc_now()
     if not user_cache_timestamp or utc_now - user_cache_timestamp > _MAX_USER_CACHE_AGE:
-        print("Would fetch new data now...")
+        _LOGGER.info("Attempting to refresh the cache for '%s'...", username)
         # Reset the user's cache timestamp regardless of success.
         # We'll try this user again at the next expiry.
         _MEMCACHED_CLIENT.set(user_timestamp_key, utc_now)
 
-    tas_list: list[str] = user_cache if user_cache is not None else []
-    count: int = len(tas_list)
+    count: int = len(user_cache)
     _LOGGER.debug("Returning %s for '%s'", count, username)
     return TargetAccessGetUserTasResponse(
         count=count,
-        target_access=tas_list,
+        target_access=user_cache,
     )

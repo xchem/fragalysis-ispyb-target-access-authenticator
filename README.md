@@ -85,6 +85,61 @@ current health of your clone with: -
 
     pre-commit run --all-files
 
+## Design
+The ISPyB Target Access Authenticator (the TAA) provides responses to **GETS** from the
+`/target-access/{username}` endpoint that is a list of **Proposals** and **Visits**
+(e.g. `lb-00000-0`). These are used by the Diamond Light Source Fragalysis Stack to
+authenticate a user's access to Targets. It does this my communicating with a
+remote MySQL database over SSH using credentials provided by the following container
+environment variables: -
+
+-   ISPYB_HOST
+-   ISPYB_PORT
+-   ISPYB_USER
+-   ISPYB_PASSWORD
+-   SSH_HOST
+-   SSH_USER
+-   SSH_PASSWORD or SSH_PRIVATE_KEY_FILENAME
+
+If the SSH_PRIVATE_KEY_FILENAME is used (rather than SSH_PASSWORD) you are expected
+to have mapped the SSH key file into the container.
+
+The TAA maintains a cache of collected target access strings using a co-located memcached
+container. The content of the cache is always returned, while the TAA regularly
+tries to synchronise the cache with any result sis gets from the ISPyB database.
+The TAA attempts to communicate with the underlyign IPSyB database after the
+current data is considered to have expired (see **Rules** below). The expiry time
+is based on the number of minutes set in the following environment variable: -
+
+-   CACHE_EXPIRY_MINUTES (default of 2)
+
+The cache contains two records of information for each user: -
+
+1.  The list of **target access strings**, indexed by url-encoded username
+2.  A UTC **timestamp** for the time a cache update attempt was made (successful or otherwise)
+
+Rules: -
+
+**If user's timestamp has expired** (or the user cache has no timestamp)
+the app attempts to collect new target access strings from the remote
+ISPyB database. If the database returns some records they replace the user's
+cache content, otherwise the cache content for the user is left untouched.
+
+After every attempt to refresh the cache for the user (successful or otherwise)
+a new *timestamp* is written to the cache for the user using the key
+`timestamp-{url-encoded-username}`.
+
+In this way the app will only try to refresh a user's target access string cache
+no more frequently than once every 2 minutes (by default).
+
+Regardless of whether the cache content is updated or not the current cache content
+for the user is always returned in the `/target-access` API response.
+
+>   Where possible the original Fragalysis modules have been retained here.
+    For example we have a `remote_ispyb_connector` module that retains the same logic
+    as its original modules in the [fragalaysis-backend]. This eases developer
+    transition to the new authentication container.
+
 ## Local development
 You can build and launch the code using the `docker-compose.yml` file.
 and make requests to the service via `http:8080/version`
@@ -105,5 +160,6 @@ for the built-in test user with `httpie`: -
 [commitizen]: https://commitizen-tools.github.io/commitizen/
 [conventional commit]: https://www.conventionalcommits.org/en/v1.0.0/
 [fastapi]: https://fastapi.tiangolo.com
+[fragalysis-backend]: https://github.com/xchem/fragalysis-backend
 [poetry]: https://python-poetry.org
 [pre-commit]: https://pre-commit.com
