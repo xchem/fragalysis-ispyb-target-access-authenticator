@@ -54,7 +54,11 @@ repos:
   hooks:
   - id: mypy
     additional_dependencies:
-    - types-requests
+    - types-pymysql
+    - types-python-dateutil
+    args:
+    - --install-types
+    - --ignore-missing-imports
 
 # Pylint
 - repo: https://github.com/pycqa/pylint

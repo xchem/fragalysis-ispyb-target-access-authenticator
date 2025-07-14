@@ -90,8 +90,14 @@ You can build and launch the code using the `docker-compose.yml` file.
 and make requests to the service via `http:8080/version`
 and `http:8080/target-access/dave%20lister`: -
 
-    docker compose build
-    docker compose up
+    docker compose up --build --detach
+
+In order to use the target access endpoint, which relies on a pre-shared key for
+authentication, you will need to provide the key via the request header
+`X-TAAQueryKey`. With the docker services started you can make a target access query
+for the built-in test user with `httpie`: -
+
+    http localhost:8080/target-access/dave%20lister 'x-taaquerykey:blob1234'
 
 ---
 
