@@ -140,6 +140,13 @@ class TargetAccessGetVersionResponse(BaseModel):
     version: str
 
 
+class TargetAccessGetPingResponse(BaseModel):
+    """/ping/ GET response."""
+
+    # Ping OK or FAILURE
+    ping: str
+
+
 class TargetAccessGetUserTasResponse(BaseModel):
     """/target-access/{username}/ GET response."""
 
@@ -258,6 +265,14 @@ def get_taa_version() -> TargetAccessGetVersionResponse:
         name="Python FastAPI",
         version=_VERSION,
     )
+
+
+@app.get("/ping/", status_code=status.HTTP_200_OK)
+def ping():
+    """Returns 'OK' if we can communicate with the underlying ISPyB service.
+    Any other value indicates an error.
+    """
+    return TargetAccessGetPingResponse(ping="OK")
 
 
 @app.get("/target-access/{username}", status_code=status.HTTP_200_OK)

@@ -61,6 +61,16 @@ that are not known: -
     This proves a crude but effective security mechanism that prevents queries without
     providing a pre-defined key.
 
+-   `/ping` **GET**
+
+```json
+{
+  "ping": "OK"
+}
+```
+
+It returns 'ping=OK' if the service is able to connect to the underlying ISPyB service.
+
 ## Contributing
 The project uses: -
 
@@ -153,6 +163,12 @@ authentication, you will need to provide the key via the request header
 the target access results for the built-in test user with `httpie`: -
 
     http localhost:8080/target-access/dave%20lister 'x-taaquerykey:blob1234'
+
+And...
+
+    http localhost:8080/ping/
+
+    http localhost:8080/version/
 
 ---
 
