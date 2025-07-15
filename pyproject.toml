@@ -32,7 +32,7 @@ isort = "^6.0.1"
 black = "^25.1.0"
 
 [tool.pylint.'MESSAGES CONTROL']
-disable = "too-few-public-methods,too-many-arguments,too-many-positional-arguments,missing-function-docstring,missing-module-docstring,missing-class-docstring"
+disable = "too-many-boolean-expressions,too-few-public-methods,too-many-arguments,too-many-positional-arguments,missing-function-docstring,missing-module-docstring,missing-class-docstring"
 
 [build-system]
 requires = ["poetry-core"]

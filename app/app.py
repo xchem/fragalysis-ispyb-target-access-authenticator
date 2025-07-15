@@ -7,6 +7,7 @@ from logging.config import dictConfig
 from typing import Annotated, Any
 from urllib.parse import quote
 
+import sshtunnel
 from dateutil.parser import parse
 from fastapi import (
     FastAPI,
@@ -14,6 +15,7 @@ from fastapi import (
     HTTPException,
     status,
 )
+from ispyb.exception import ISPyBConnectionException, ISPyBNoResultException
 from pydantic import BaseModel
 from pymemcache.client.base import Client, KeepaliveOpts
 from pymemcache.client.retrying import RetryingClient
@@ -43,23 +45,23 @@ app = FastAPI()
 # We use custom serialisers to convert our list of strings
 # to/from a string (which is the memcached native value type).
 # Memcached value size if limited to 1MB - about 90_000 TAS strings?
-def _json_serialiser(key, value):
+def _set_serialiser(key, value):
     del key
     if isinstance(value, str):
         return (value, 1)
     if isinstance(value, datetime):
         return (str(value), 2)
-    return (json.dumps(value), 3)
+    return (repr(value), 3)
 
 
-def _json_deserialiser(key, value, flags):
+def _set_deserialiser(key, value, flags):
     del key
     if flags == 1:
         return value
     if flags == 2:
         return parse(value)
     if flags == 3:
-        return json.loads(value)
+        return eval(value)  # pylint: disable=eval-used
     # How did we get here?
     assert False
 
@@ -83,8 +85,8 @@ _MEMCACHED_BASE_CLIENT: Client = Client(
     encoding="utf-8",
     timeout=0.5,
     socket_keepalive=_MEMCACHED_KEEPALIVE,
-    serializer=_json_serialiser,
-    deserializer=_json_deserialiser,
+    serializer=_set_serialiser,
+    deserializer=_set_deserialiser,
 )
 _MEMCACHED_CLIENT: RetryingClient = RetryingClient(
     _MEMCACHED_BASE_CLIENT,
@@ -100,27 +102,27 @@ def _utc_now() -> datetime:
 
 # Inject some mock data for "dave lister".
 _DUMMY_USER: str = quote("dave lister")
-_MEMCACHED_CLIENT.set(_DUMMY_USER, ["sb99999-9"])
+_DUMMY_TAS: set[str] = set(["sb99999-9"])
+_MEMCACHED_CLIENT.set(_DUMMY_USER, _DUMMY_TAS)
 _MEMCACHED_CLIENT.set(f"{_TIMESTAMP_KEY_PREFIX}{_DUMMY_USER}", _utc_now())
 
-# Do we have a connector configured?
-# Yes if: -
-# - Config.ISPYB_HOST
-_SSH_CONNECTOR: SSHConnector | None = None
-if Config.ISPYB_HOST:
-    # Other ISPyB variables are required...
-    assert Config.ISPYB_PORT
-    assert Config.ISPYB_USER
-    assert Config.ISPYB_PASSWORD
-    # And SSH variables...
-    assert Config.SSH_HOST
-    assert Config.SSH_USER
-    assert Config.SSH_PASSWORD or Config.SSH_PRIVATE_KEY_FILENAME
+
+# Do we have sufficient configuration for an SSH connector?
+_SSH_CONNECTOR_CONFIGURED: bool = False
+if (
+    Config.ISPYB_HOST
+    and Config.ISPYB_PORT
+    and Config.ISPYB_USER
+    and Config.ISPYB_PASSWORD
+    and Config.SSH_HOST
+    and Config.SSH_USER
+    and Config.SSH_PRIVATE_KEY_FILENAME
+):
     # Create a connector
-    _SSH_CONNECTOR = SSHConnector()
-    _LOGGER.info("Created SSHConnector(%s)", Config.SSH_HOST)
+    _SSH_CONNECTOR_CONFIGURED = True
+    _LOGGER.info("I have sufficient configuration to establish an SSH connection")
 else:
-    _LOGGER.warning("Insufficient configuration to query ISPyB")
+    _LOGGER.warning("Insufficient configuration to establish an SSH connection")
 
 # Get our version (from the 'VERSION' file)
 with open("VERSION", "r", encoding="utf-8") as version_file:
@@ -145,6 +147,104 @@ class TargetAccessGetUserTasResponse(BaseModel):
     count: int
     # Possibly empty list of Target Access strings
     target_access: list[str]
+
+
+def _get_connector() -> SSHConnector | None:
+    """Tries to create an SSHConnector(), which may fail."""
+    conn: SSHConnector | None = None
+    if _SSH_CONNECTOR_CONFIGURED:
+        _LOGGER.info("Creating SSHConnector() for '%s'..", Config.SSH_HOST)
+        try:
+            conn = SSHConnector()
+        except ISPyBConnectionException:
+            # The ISPyB connection failed.
+            # Nothing else to do here, metrics are already updated
+            _LOGGER.info("ISPyB connection failure")
+        except sshtunnel.BaseSSHTunnelForwarderError:
+            _LOGGER.info("Failed to establish a connector")
+    return conn
+
+
+def _get_tas_from_remote_ispyb(username: str) -> set[str] | None:
+    """Gets the user's proposal. It returns None on error, an empty set if
+    there are no proposals or a set of proposals.
+    """
+    assert username
+
+    ssh_connector: SSHConnector | None = _get_connector()
+    if not ssh_connector:
+        _LOGGER.warning("No SSH connector for user '%s'", username)
+        return None
+
+    prop_id_set: set[str] = set()
+    rs: list[dict[str, Any]] | None = None
+    try:
+        rs = ssh_connector.core.retrieve_sessions_for_person_login(username)
+    except ISPyBNoResultException:
+        _LOGGER.warning("No results for user '%s'", username)
+        rs = []
+    # Request done, always stop the server
+    if ssh_connector.server:
+        ssh_connector.server.stop()
+
+    # Anything to process?
+    if rs is None:
+        return None
+    if not rs:
+        _LOGGER.warning("No results for user '%s'", username)
+        return prop_id_set
+
+    # Typically you'll find the following fields in each item
+    # in the rs response: -
+    #
+    #    'id': 0000000,
+    #    'proposalId': 00000,
+    #    'startDate': datetime.datetime(2022, 12, 1, 15, 56, 30)
+    #    'endDate': datetime.datetime(2022, 12, 3, 18, 34, 9)
+    #    'beamline': 'i00-0'
+    #    'proposalCode': 'lb'
+    #    'proposalNumber': '12345'
+    #    'sessionNumber': 1
+    #    'comments': None
+    #    'personRoleOnSession': 'Data Access'
+    #    'personRemoteOnSession': 1
+    #
+    # Iterate through the response and return the 'proposalNumber' (proposals)
+    # and one with the 'proposalNumber' and 'sessionNumber' (visits), each
+    # prefixed by the `proposalCode` (if present).
+    #
+    # Codes are expected to consist of 2 letters.
+    # Typically: lb, mx, nt, nr, bi but the codes we support
+    # are defined in Config.TAS_CODES_SET.
+    #
+    # These strings should correspond to a title value in a Project record.
+    # and should get this sort of set: -
+    #
+    # ["lb12345", "lb12345-1"]
+    #              --      -
+    #              | ----- |
+    #           Code   |   Session
+    #               Proposal
+    for record in rs:
+        if "proposalCode" in record and record["proposalCode"] in Config.TAS_CODES_SET:
+            pc_str = f'{record["proposalCode"]}'
+            pn_str = f'{record["proposalNumber"]}'
+            sn_str = f'{record["sessionNumber"]}'
+            proposal_str = f"{pc_str}{pn_str}"
+            proposal_visit_str = f"{proposal_str}-{sn_str}"
+            prop_id_set.update([proposal_str, proposal_visit_str])
+
+    # Display the collected results for the user.
+    # These will be cached.
+    count = len(prop_id_set)
+    _LOGGER.debug(
+        "%s proposals from %s records for '%s': %s",
+        count,
+        len(rs),
+        username,
+        prop_id_set,
+    )
+    return prop_id_set
 
 
 # Endpoints for the 'public-facing' event-stream web-socket API ------------------------
@@ -183,7 +283,7 @@ def get_taa_user_tas(
 
     # Get cached user data and any related timestamp.
     user_timestamp_key: str = f"{_TIMESTAMP_KEY_PREFIX}{encoded_username}"
-    user_cache: list[str] = _MEMCACHED_CLIENT.get(encoded_username) or []
+    user_cache: set[str] = _MEMCACHED_CLIENT.get(encoded_username) or set()
     user_cache_timestamp: datetime | None = _MEMCACHED_CLIENT.get(user_timestamp_key)
 
     # If the user's cache is empty or the cache record is too old
@@ -191,6 +291,15 @@ def get_taa_user_tas(
     utc_now: datetime = _utc_now()
     if not user_cache_timestamp or utc_now - user_cache_timestamp > _MAX_USER_CACHE_AGE:
         _LOGGER.info("Attempting to refresh the cache for '%s'...", username)
+        new_tas_set: set[str] | None = _get_tas_from_remote_ispyb(username=username)
+        if new_tas_set is not None:
+            # Success.
+            # An empty list is considered successful - it means the user is known
+            # but does not have access to any proposals/visits.
+            _MEMCACHED_CLIENT.set(encoded_username, new_tas_set)
+            _LOGGER.info("Cache for '%s' set (%s)", username, len(new_tas_set))
+        else:
+            _LOGGER.warning("Failed to get TAS set for '%s'", username)
         # Reset the user's cache timestamp regardless of success.
         # We'll try this user again at the next expiry.
         _MEMCACHED_CLIENT.set(user_timestamp_key, utc_now)

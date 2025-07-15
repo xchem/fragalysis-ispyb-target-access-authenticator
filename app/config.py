@@ -8,7 +8,7 @@ class Config:
     CACHE_EXPIRY_MINUTES: int = int(os.environ.get("TAA_CACHE_EXPIRY_MINUTES", "2"))
 
     ISPYB_HOST: str | None = os.environ.get("TAA_ISPYB_HOST")
-    ISPYB_PORT: str | None = os.environ.get("TAA_ISPYB_PORT")
+    ISPYB_PORT: int | None = int(os.environ.get("TAA_ISPYB_PORT", "0"))
     ISPYB_USER: str | None = os.environ.get("TAA_ISPYB_USER")
     ISPYB_PASSWORD: str | None = os.environ.get("TAA_ISPYB_PASSWORD")
     ISPYB_DB: str = os.environ.get("TAA_ISPYB_DB", "db")
@@ -16,7 +16,7 @@ class Config:
 
     SSH_HOST: str | None = os.environ.get("TAA_SSH_HOST")
     SSH_USER: str | None = os.environ.get("TAA_SSH_USER")
-    SSH_PASSWORD: str | None = os.environ.get("TAA_SSH_PASSWORD")
+    SSH_PASSWORD: None = None  # No longer used
     SSH_PRIVATE_KEY_FILENAME: str | None = os.environ.get(
         "TAA_SSH_PRIVATE_KEY_FILENAME"
     )
@@ -24,3 +24,6 @@ class Config:
     MEMCACHED_LOCATION: str = os.getenv("TAA_MEMCACHED_LOCATION", "localhost")
 
     QUERY_KEY: str | None = os.getenv("TAA_QUERY_KEY")
+
+    TAS_CODES: str = os.environ.get("TAA_TAS_CODES", "lb")
+    TAS_CODES_SET: set[str] = set(TAS_CODES.split(",")) if TAS_CODES else set()

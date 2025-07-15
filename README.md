@@ -149,8 +149,8 @@ and `localhost:8080/target-access/dave%20lister`: -
 
 In order to use the target access endpoint, which relies on a pre-shared key for
 authentication, you will need to provide the key via the request header
-`X-TAAQueryKey`. With the docker services started you can make a target access query
-for the built-in test user with `httpie`: -
+`X-TAAQueryKey`. With the docker services started you should be able to query
+the target access results for the built-in test user with `httpie`: -
 
     http localhost:8080/target-access/dave%20lister 'x-taaquerykey:blob1234'
 
