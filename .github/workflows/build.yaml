@@ -18,6 +18,10 @@ name: build
 
 on:
   push:
+    branches:
+    - '*'
+    tags-ignore:
+    - '*'
   schedule:
   # Build every Sunday (0) at 4:30pm
   - cron: '30 16 * * 0'
