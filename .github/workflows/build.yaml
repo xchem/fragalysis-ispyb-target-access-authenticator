@@ -30,7 +30,11 @@ jobs:
       uses: rlespinasse/github-slug-action@v5
     - name: Checkout
       uses: actions/checkout@v4
+    - name: Set lower case owner name
+      run: echo "owner=${OWNER,,}" >> "$GITHUB_ENV"
+      env:
+        OWNER: '${{ github.repository_owner }}'
     - name: Build
       uses: docker/build-push-action@v6
       with:
-        tags: xchem/fragalysis-ispyb-target-access-authenticator:latest
+        tags: ${{ env.owner }}/fragalysis-ispyb-target-access-authenticator:latest
