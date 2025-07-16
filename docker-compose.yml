@@ -1,43 +1,16 @@
 ---
+# Extends the base services file
+# and provides a 'TAA_SSH_PASSWORD'
 services:
 
   memcached:
-    image: memcached:1.6.38-alpine3.21
-    container_name: memcached
-    environment:
-      MEMCACHED_MAX_ITEM_SIZE: 8000
-      MEMCACHED_MAX_CONNECTIONS: 1
-      MEMCACHED_MEMORY_LIMIT: 64
-    ports:
-    - '11211:11211'
+    extends:
+      file: base-services.yml
+      service: memcached
 
   taa:
-    build:
-      context: .
-    image: xchem/fragalysis-ispyb-target-access-authenticator:latest
-    container_name: taa
+    extends:
+      file: base-services.yml
+      service: taa
     environment:
-      TAA_ENABLE_DAVE_LISTER: ${TAA_ENABLE_DAVE_LISTER}
-      # If you expected to be able to connect to the ISPyB SSH service,
-      # populate the following using a suitable .env file
-      TAA_ISPYB_HOST: ${TAA_ISPYB_HOST}
-      TAA_ISPYB_PORT: ${TAA_ISPYB_PORT}
-      TAA_ISPYB_USER: ${TAA_ISPYB_USER}
-      TAA_ISPYB_PASSWORD: ${TAA_ISPYB_PASSWORD}
-      TAA_SSH_HOST: ${TAA_SSH_HOST}
-      TAA_SSH_USER: ${TAA_SSH_USER}
       TAA_SSH_PASSWORD: ${TAA_SSH_PASSWORD}
-      TAA_SSH_PRIVATE_KEY_FILENAME: ${TAA_SSH_PRIVATE_KEY_FILENAME}
-      # Non-sensitive configuration
-      TAA_QUERY_KEY: blob1234
-      TAA_MEMCACHED_LOCATION: memcached
-      TAA_CACHE_EXPIRY_MINUTES: 2
-      TAA_PING_CACHE_EXPIRY_SECONDS: 25
-    ports:
-    - '8080:8080'
-    volumes:
-      # You're expected to have an SSH private key file in your .ssh directory
-    - ${HOME}/.ssh/fragalysis-stack:/home/taa/ssh-private-key
-    depends_on:
-      memcached:
-        condition: service_started

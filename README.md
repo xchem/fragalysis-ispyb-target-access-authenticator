@@ -160,6 +160,14 @@ Build and launch the code using the `docker compose` file: -
 
     docker compose up --build --detach
 
+We rely on docker compose `extend` capability to use a `base-services.yml` compose file
+that is then "sepcialised" by either a `docker-compose.yml` or
+`docker-compose-private-key.yml`. The former uses SSH passwords,the latter a
+private key file. So, if you want to use a private key file for SSH connections
+(and have a `~/.ssh/fragalysis-stack` key-file) run: -
+
+    docker compose --file docker-compose-private-key.yml up --build --detach
+
 In order to use the target access endpoint, which relies on a pre-shared key for
 authentication, you will need to provide the key that is set in the docker compose file
 via the request header `X-TAAQueryKey`.

@@ -1,0 +1,20 @@
+---
+# Extends the base services file
+# and provides a 'TAA_SSH_PRIVATE_KEY_FILENAME'
+# Here we map the file ${HOME}/.ssh/fragalysis-stack
+# (a private key file) into the TAA container.
+services:
+
+  memcached:
+    extends:
+      file: base-services.yml
+      service: memcached
+
+  taa:
+    extends:
+      file: base-services.yml
+      service: taa
+    environment:
+      TAA_SSH_PRIVATE_KEY_FILENAME: /home/taa/ssh-private-key
+    volumes:
+    - ${HOME}/.ssh/fragalysis-stack:/home/taa/ssh-private-key

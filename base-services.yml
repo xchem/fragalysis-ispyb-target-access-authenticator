@@ -1,0 +1,43 @@
+---
+# A docker compose definition that declares the base (common) services,
+# relies on environment variables (defined in '.env'),
+# and is 'extended' by either 'docker-compose.yml' or 'docker-compose-private-key.yml'
+services:
+
+  memcached:
+    image: memcached:1.6.38-alpine3.21
+    container_name: memcached
+    environment:
+      MEMCACHED_MAX_ITEM_SIZE: 8000
+      MEMCACHED_MAX_CONNECTIONS: 1
+      MEMCACHED_MEMORY_LIMIT: 64
+    ports:
+    - '11211:11211'
+
+  taa:
+    build:
+      context: .
+    image: xchem/fragalysis-ispyb-target-access-authenticator:${TAA_IMAGE_TAG:-latest}
+    container_name: taa
+    environment:
+      TAA_ENABLE_DAVE_LISTER: ${TAA_ENABLE_DAVE_LISTER}
+      # If you expected to be able to connect to the ISPyB SSH service,
+      # populate the following using a suitable .env file
+      TAA_ISPYB_HOST: ${TAA_ISPYB_HOST}
+      TAA_ISPYB_PORT: ${TAA_ISPYB_PORT}
+      TAA_ISPYB_USER: ${TAA_ISPYB_USER}
+      TAA_ISPYB_PASSWORD: ${TAA_ISPYB_PASSWORD}
+      TAA_SSH_HOST: ${TAA_SSH_HOST}
+      TAA_SSH_USER: ${TAA_SSH_USER}
+      TAA_SSH_PASSWORD: ${TAA_SSH_PASSWORD}
+      TAA_SSH_PRIVATE_KEY_FILENAME: ${TAA_SSH_PRIVATE_KEY_FILENAME}
+      # Non-sensitive configuration
+      TAA_QUERY_KEY: blob1234
+      TAA_MEMCACHED_LOCATION: memcached
+      TAA_CACHE_EXPIRY_MINUTES: 2
+      TAA_PING_CACHE_EXPIRY_SECONDS: 25
+    ports:
+    - '8080:8080'
+    depends_on:
+      memcached:
+        condition: service_started
