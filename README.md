@@ -38,7 +38,7 @@ That returns the following properties, each value being a string in a **200** re
 {
   "version": "1.0.0",
   "kind": "ISPYB",
-  "name": "XChem ISPyB Authenticator"
+  "name": "XChem Python FastAPI TAS Authenticator"
 }
 ```
 
@@ -151,16 +151,26 @@ for the user is always returned in the `/target-access` API response.
     transition to the new authentication container.
 
 ## Local development
-You can build and launch the code using the `docker-compose.yml` file.
-and make requests to the service via `localhost:8080/version`
-and `localhost:8080/target-access/dave%20lister`: -
+There's a `docker-compose.yml` file to deploy the authenticator and memcached.
+It also relies on [environment variables] that you can easily set using a `.env` file
+(which is excluded from any repository commits).
+
+Build and launch the code using the `docker compose` file: -
 
     docker compose up --build --detach
 
 In order to use the target access endpoint, which relies on a pre-shared key for
-authentication, you will need to provide the key via the request header
-`X-TAAQueryKey`. With the docker services started you should be able to query
-the target access results for the built-in test user with `httpie`: -
+authentication, you will need to provide the key that is set in the docker compose file
+via the request header `X-TAAQueryKey`.
+
+With the containers running you should be able to query
+target access results for a user with `httpie`. Here we query user `abc`
+(whose name has to be url encoded): -
+
+    http localhost:8080/target-access/abc 'x-taaquerykey:blob1234'
+
+To get some built-in results, if you've set the `TAA_ENABLE_DAVE_LISTER` environment
+variable to `yes`, you can get some test results with that username: -
 
     http localhost:8080/target-access/dave%20lister 'x-taaquerykey:blob1234'
 
@@ -170,11 +180,16 @@ And...
 
     http localhost:8080/version/
 
+You can terminate the local installation with: -
+
+    docker compose down
+
 ---
 
 [black]: https://black.readthedocs.io/en/stable
 [commitizen]: https://commitizen-tools.github.io/commitizen/
 [conventional commit]: https://www.conventionalcommits.org/en/v1.0.0/
+[environment variables]: https://docs.docker.com/compose/how-tos/environment-variables/set-environment-variables/
 [fastapi]: https://fastapi.tiangolo.com
 [fragalysis-backend]: https://github.com/xchem/fragalysis-backend
 [memcached]: https://memcached.org

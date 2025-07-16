@@ -39,6 +39,26 @@ _LOGGER = logging.getLogger(__name__)
 
 app = FastAPI()
 
+_VERSION_KIND: str = "ISPYB"
+_VERSION_NAME: str = "XChem Python FastAPI TAS Authenticator"
+
+# We cache target access strings (obtained from ISPyB) against a key
+# based on the URL-encoded value of the user's username.
+# We also cache the time (UTC) when the last target access strings were collected.
+# This UTC is recorded against the key 'timestamp-{url-encoded-username}'.
+# If the timestamp of the cache has expired we try and collect a new set of
+# target access strings. if that fails we return the existing cache.
+
+_TIMESTAMP_KEY_PREFIX: str = "timestamp-"
+_MAX_USER_CACHE_AGE: timedelta = timedelta(minutes=Config.CACHE_EXPIRY_MINUTES)
+
+# The memcached key for the Ping cache (and its timestamp)
+# This cannot be mistaken for a username - and we check this
+# early in the /target-access endpoint. the
+_PING_CACHE_KEY: str = "-"
+_PING_CACHE_TIMESTAMP_KEY: str = f"{_TIMESTAMP_KEY_PREFIX}{_PING_CACHE_KEY}"
+_MAX_PING_CACHE_AGE: timedelta = timedelta(seconds=Config.PING_CACHE_EXPIRY_SECONDS)
+
 # Configure memcached.
 
 
@@ -66,16 +86,6 @@ def _set_deserialiser(key, value, flags):
     assert False
 
 
-# We cache target access strings (obtained from ISPyB) against a key
-# based on the URL-encoded value of the user's username.
-# We also cache the time (UTC) when the last target access strings were collected.
-# This UTC is recorded against the key 'timestamp-{url-encoded-username}'.
-# If the timestamp of the cache has expired we try and collect a new set of
-# target access strings. if that fails we return the existing cache.
-
-_TIMESTAMP_KEY_PREFIX: str = "timestamp-"
-_MAX_USER_CACHE_AGE: timedelta = timedelta(minutes=Config.CACHE_EXPIRY_MINUTES)
-
 # The location is either a host ("localhost") or host and port ("localhost:1234").
 # If the port is not the expected default of 11211 is assumed.
 _MEMCACHED_KEEPALIVE: KeepaliveOpts = KeepaliveOpts(idle=35, intvl=8, cnt=5)
@@ -97,14 +107,15 @@ _MEMCACHED_CLIENT: RetryingClient = RetryingClient(
 
 
 def _utc_now() -> datetime:
+    """Get the current time (UTC)."""
     return datetime.now(timezone.utc)
 
 
-# Inject some mock data for "dave lister".
-_DUMMY_USER: str = quote("dave lister")
-_DUMMY_TAS: set[str] = set(["sb99999-9"])
-_MEMCACHED_CLIENT.set(_DUMMY_USER, _DUMMY_TAS)
-_MEMCACHED_CLIENT.set(f"{_TIMESTAMP_KEY_PREFIX}{_DUMMY_USER}", _utc_now())
+# Inject some mock data for "dave lister"?
+if Config.ENABLE_DAVE_LISTER:
+    _DUMMY_USER: str = quote("dave lister")
+    _MEMCACHED_CLIENT.set(_DUMMY_USER, set(["sb99999-9"]))
+    _MEMCACHED_CLIENT.set(f"{_TIMESTAMP_KEY_PREFIX}{_DUMMY_USER}", _utc_now())
 
 
 # Do we have sufficient configuration for an SSH connector?
@@ -116,7 +127,7 @@ if (
     and Config.ISPYB_PASSWORD
     and Config.SSH_HOST
     and Config.SSH_USER
-    and Config.SSH_PRIVATE_KEY_FILENAME
+    and (Config.SSH_PRIVATE_KEY_FILENAME or Config.SSH_PASSWORD)
 ):
     # Create a connector
     _SSH_CONNECTOR_CONFIGURED = True
@@ -169,6 +180,9 @@ def _get_connector() -> SSHConnector | None:
             _LOGGER.info("ISPyB connection failure")
         except sshtunnel.BaseSSHTunnelForwarderError:
             _LOGGER.info("Failed to establish a connector")
+    else:
+        _LOGGER.debug("Insufficient configuration to create a connector")
+
     return conn
 
 
@@ -254,25 +268,40 @@ def _get_tas_from_remote_ispyb(username: str) -> set[str] | None:
     return prop_id_set
 
 
-# Endpoints for the 'public-facing' event-stream web-socket API ------------------------
+# Endpoints (in-cluster) for the ISPyP Authenticator -----------------------------------
 
 
 @app.get("/version/", status_code=status.HTTP_200_OK)
 def get_taa_version() -> TargetAccessGetVersionResponse:
     """Returns our version information"""
     return TargetAccessGetVersionResponse(
-        kind="ISPYB",
-        name="Python FastAPI",
+        kind=_VERSION_KIND,
+        name=_VERSION_NAME,
         version=_VERSION,
     )
 
 
 @app.get("/ping/", status_code=status.HTTP_200_OK)
 def ping():
-    """Returns 'OK' if we can communicate with the underlying ISPyB service.
-    Any other value indicates an error.
+    """Returns 'OK' if we can communicate with the underlying ISPyB service
+    (i.e. create a connector). Anything other than 'OK' indicates a problem.
     """
-    return TargetAccessGetPingResponse(ping="OK")
+    # Throttle /ping requests by only querying the underlying service
+    # if there's no cached ping result or it's too old...
+    utc_now: datetime = _utc_now()
+    ping_cache_timestamp: datetime | None = _MEMCACHED_CLIENT.get(
+        _PING_CACHE_TIMESTAMP_KEY
+    )
+    if not ping_cache_timestamp or utc_now - ping_cache_timestamp > _MAX_PING_CACHE_AGE:
+        _LOGGER.debug("ping cache value is too old - refreshing...")
+        if ssh_connector := _get_connector():
+            ssh_connector.server.stop()
+            _MEMCACHED_CLIENT.set(_PING_CACHE_KEY, "OK")
+        else:
+            _MEMCACHED_CLIENT.set(_PING_CACHE_KEY, "NOT OK")
+        _MEMCACHED_CLIENT.set(_PING_CACHE_TIMESTAMP_KEY, utc_now)
+
+    return TargetAccessGetPingResponse(ping=_MEMCACHED_CLIENT.get(_PING_CACHE_KEY))
 
 
 @app.get("/target-access/{username}", status_code=status.HTTP_200_OK)
@@ -290,11 +319,22 @@ def get_taa_user_tas(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid/missing X_TAAQueryKey",
         )
+    if username == _PING_CACHE_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Username cannot be '{_PING_CACHE_KEY}'",
+        )
     _LOGGER.debug("Request for '%s'", username)
 
     # FastAPI decodes url-encoded strings and memcached keys cannot contain spaces
     # so we need to re-encode the username for cache lookup.
+    # memcached has a key size limit of 250 characters.
     encoded_username: str = quote(username)
+    if len(encoded_username) > 250:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Encoded username exceeds 250 characters",
+        )
 
     # Get cached user data and any related timestamp.
     user_timestamp_key: str = f"{_TIMESTAMP_KEY_PREFIX}{encoded_username}"
@@ -320,7 +360,8 @@ def get_taa_user_tas(
         _MEMCACHED_CLIENT.set(user_timestamp_key, utc_now)
 
     count: int = len(user_cache)
-    _LOGGER.debug("Returning %s for '%s'", count, username)
+    record: str = "record" if count == 1 else "records"
+    _LOGGER.debug("Returning %s %s for '%s'", count, record, username)
     return TargetAccessGetUserTasResponse(
         count=count,
         target_access=user_cache,
