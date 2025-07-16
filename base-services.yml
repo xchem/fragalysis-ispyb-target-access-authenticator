@@ -14,11 +14,11 @@ services:
     ports:
     - '11211:11211'
 
-  taa:
+  ta-authenticator:
     build:
       context: .
     image: xchem/fragalysis-ispyb-target-access-authenticator:${TAA_IMAGE_TAG:-latest}
-    container_name: taa
+    container_name: ta-authenticator
     environment:
       TAA_ENABLE_DAVE_LISTER: ${TAA_ENABLE_DAVE_LISTER}
       # If you expected to be able to connect to the ISPyB SSH service,
@@ -29,8 +29,6 @@ services:
       TAA_ISPYB_PASSWORD: ${TAA_ISPYB_PASSWORD}
       TAA_SSH_HOST: ${TAA_SSH_HOST}
       TAA_SSH_USER: ${TAA_SSH_USER}
-      TAA_SSH_PASSWORD: ${TAA_SSH_PASSWORD}
-      TAA_SSH_PRIVATE_KEY_FILENAME: ${TAA_SSH_PRIVATE_KEY_FILENAME}
       # Non-sensitive configuration
       TAA_QUERY_KEY: blob1234
       TAA_MEMCACHED_LOCATION: memcached

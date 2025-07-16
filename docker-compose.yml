@@ -8,9 +8,9 @@ services:
       file: base-services.yml
       service: memcached
 
-  taa:
+  ta-authenticator:
     extends:
       file: base-services.yml
-      service: taa
+      service: ta-authenticator
     environment:
       TAA_SSH_PASSWORD: ${TAA_SSH_PASSWORD}
