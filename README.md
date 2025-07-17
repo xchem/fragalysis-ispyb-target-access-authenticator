@@ -18,20 +18,12 @@ partly responsible for caching the regular SSH and MySQL ISPyB database access m
 that restricts user access to objects in the stack based on their membership of *Proposals*
 and *Visits*.
 
-By providing an abstraction of the original security logic an administrator
-can replace the Pod with another offering its' own security implementation and so the
-stack's reliance omn ISPyB as a backing database is relaxed.
-
-The service is deployed into Kubernetes, typically in its own Namespace, along
-with a Service definition to allow in-cluster queries. By extracting the security
-logic from the Stack administrators can deploy custom authentication implementations
-using services other than ISPyB. For example you may control Target Access from
-PostgreSQL database. If so, you simply have to deploy your own access implementation -
-all it has to do is provide the same service. The choice of authentication
-implementation is yours. You could for example  deploy a _dummy_ service for testing that
-has a built-in (hard-coded) set of Target Access strings and users and it allows
-you to develop locally (offline) without needing to connect to any _real_
-underlying service.
+By providing an abstraction of the original security logic in an independent **Pod**
+(and **Service**) an administrator can replace it with another with its own implementation.
+For example, when testing you could replace the official ISPyB service with a custom
+or **mock** implementation that provides a well-known set of responses for your users.
+In this way you can develop code and not have to rely on access to the true source
+of target access strings.
 
 Any service implementation can be deployed, this one provides remote (SSH) access to
 ISPyB using a container image based on Python and [FastAPI].
@@ -106,8 +98,13 @@ current health of your clone with: -
     pre-commit run --all-files
 
 ## Design
-The ISPyB Target Access Authenticator (the TAA) provides responses to **GETS** from the
-`/target-access/{username}` endpoint that is a list of **Proposals** and **Visits**
+We use Python's [FastAPI] framework to offer a lightweight implementation of an
+HTTP service that is expected to be deployed as a **Pod** and **Service** in
+kubernetes. It borrows the ISPyB access logic present in the stack's `security` module
+and utilises a [memcached] container (co-located in the same Pod) to cache results.
+
+The ISPyB Target Access Authenticator (the TAA) provides responses to **GET** requests
+from the `/target-access/{username}` endpoint that is a list of *Proposals* and *Visits*
 (e.g. `lb00000-0`). These are used by the Diamond Light Source Fragalysis Stack to
 authenticate a user's access to Targets. It does this my communicating with a
 remote MySQL database over SSH using credentials provided by the following container
@@ -124,33 +121,40 @@ environment variables: -
 If the TAA_SSH_PRIVATE_KEY_FILENAME is used (rather than TAA_SSH_PASSWORD) you are expected
 to have mapped the SSH key file into the container.
 
-The TAA maintains a cache of collected target access strings using a co-located [memcached]
-container. The content of the cache is always returned, while the TAA regularly
-tries to synchronise the cache with any results it gets from the ISPyB database.
-The TAA attempts to communicate with the underlying IPSyB database after the
-cache is considered to have expired (see **Rules** below). The expiry time
-is based on the number of minutes set in the following environment variable: -
+Two types of records are cached for each user, one using the url-encoded username as
+a key to record results retrieved from the ISPyB database and a second, using the
+url-encoded username with a `timestamp-` prefix, to record the time results were
+last collected from ISPyB.
+
+The ISpyB database is queried if there are no records for a user or exiting records
+are too old. The maximum age of cached results is based on the number of minutes set
+in the following container environment variables: -
 
 -   TAA_CACHE_EXPIRY_MINUTES (default of 2)
+-   TAA_PING_CACHE_EXPIRY_SECONDS (default 25 seconds)
 
-The cache contains two records of information for each user: -
-
-1.  The list of **target access strings**, indexed by url-encoded username
-2.  A UTC **timestamp** for the time a cache update attempt was made (successful or otherwise)
+The authenticator also caches the `/ping` response as a ping requires the authenticator
+to query the ISPyB database.
 
 Rules: -
 
 **If user's timestamp has expired** (or the user cache has no timestamp)
 the app attempts to collect new target access strings from the remote
 ISPyB database. If the database returns some records they replace the user's
-cache content, otherwise the cache content for the user is left untouched.
+cache content, otherwise the cache content for the user is left unmodified.
 
 After every attempt to refresh the cache for the user (successful or otherwise)
 a new *timestamp* is written to the cache for the user using the key
 `timestamp-{url-encoded-username}`.
 
+The cached values are never discarded. The current cache is returned to tht caller
+until it can be successfully replaced by new results from a fresh ISPyB query.
+
+For each user ISPyB is not queried more often than once in the defined expiry period.
 In this way the app will only try to refresh a user's target access string cache
 no more frequently than once every 2 minutes (by default).
+
+If the authentication container restarts cache results are lost.
 
 Regardless of whether the cache content is updated or not the current cache content
 for the user is always returned in the `/target-access` API response.
@@ -171,7 +175,7 @@ Build and launch the code using the `docker compose` file: -
 
 We rely on docker compose `extend` capability to use a `base-services.yml` compose file
 that is then "sepcialised" by either a `docker-compose.yml` or
-`docker-compose-private-key.yml`. The former uses SSH passwords,the latter a
+`docker-compose-private-key.yml`. The former uses SSH passwords, the latter a
 private key file. So, if you want to use a private key file for SSH connections
 (and have a `~/.ssh/fragalysis-stack` key-file) run: -
 
@@ -179,7 +183,7 @@ private key file. So, if you want to use a private key file for SSH connections
 
 In order to use the target access endpoint, which relies on a pre-shared key for
 authentication, you will need to provide the key that is set in the docker compose file
-via the request header `X-TAAQueryKey`.
+via the request header `X-TAAQueryKey` (this is set to `blob1234`)
 
 With the containers running you should be able to query
 target access results for a user with `httpie`. Here we query user `abc`
@@ -188,11 +192,11 @@ target access results for a user with `httpie`. Here we query user `abc`
     http localhost:8080/target-access/abc 'x-taaquerykey:blob1234'
 
 To get some built-in results, if you've set the `TAA_ENABLE_DAVE_LISTER` environment
-variable to `yes`, you can get some test results with that username: -
+variable to `yes`, you can get some realistic test results with that username: -
 
     http localhost:8080/target-access/dave%20lister 'x-taaquerykey:blob1234'
 
-And...
+You can execute the ping and version endpoints too...
 
     http localhost:8080/ping/
 
