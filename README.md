@@ -39,7 +39,7 @@ ISPyB using a container image based on Python and [FastAPI].
 The stack's _contract_ requires the following endpoints from any implementation
 of the authenticator: -
 
--   `/version` **GET**
+### `/version` **GET**
 
 That returns the following properties, each value being a string in a **200** response: -
 
@@ -56,7 +56,7 @@ and returns an array of Target Access Strings the user is entitles to access.
 The response should be a **200** and a **404** for usernames
 that are not known: -
 
--   `/target-access/{username}` **GET**
+### `/target-access/{username}` **GET**
 
 ```json
 {
@@ -70,7 +70,7 @@ that are not known: -
     This proves a crude but effective security mechanism that prevents queries without
     providing a pre-defined key.
 
--   `/ping` **GET**
+### `/ping` **GET**
 
 ```json
 {
