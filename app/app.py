@@ -310,7 +310,7 @@ def get_taa_user_tas(
     x_taaquerykey: Annotated[str | None, Header()] = None,
 ):
     """Returns the list of target access strings for a user.
-    the user must provide a valid 'query key' - the one we've been
+    The user must provide a valid 'query key' - the one we've been
     configured with.
     """
     # We can only continue if the correct query key has been provided.
