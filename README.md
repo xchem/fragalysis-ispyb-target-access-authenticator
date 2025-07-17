@@ -31,9 +31,9 @@ ISPyB using a container image based on Python and [FastAPI].
 The stack's _contract_ requires the following endpoints from any implementation
 of the authenticator: -
 
-### `/version` **GET**
+### `/version` **[GET]**
 
-That returns the following properties, each value being a string in a **200** response: -
+That returns a **200** response with the following properties: -
 
 ```json
 {
@@ -43,7 +43,10 @@ That returns the following properties, each value being a string in a **200** re
 }
 ```
 
-### `/target-access/{username}` **GET**
+The stack can use the response as it sees fit, but it might want to display
+the response in the UI.
+
+### `/target-access/{username}` **[GET]**
 
 A stack requests Target Access Strings from the authenticator based on URL-encoded
 usernames, and the authenticator returns a count and an array of those the user is
@@ -63,7 +66,7 @@ The response should be a **200** and a **4XX** for errors: -
     This proves a crude but effective protection mechanism that prevents queries from
     clients that have not been supplied with the query key.
 
-### `/ping` **GET**
+### `/ping` **[GET]**
 
 ```json
 {
@@ -71,8 +74,9 @@ The response should be a **200** and a **4XX** for errors: -
 }
 ```
 
-It returns a `ping` string property that is `OK` if the service is able to connect to
-the underlying (ISPyB) service and something else if there are problems.
+It returns a **200** response with a `ping` string property that is `OK` if the
+authenticator is able to connect to the underlying (ISPyB) service. the string
+is not `OK` if there are problems.
 
 ## Contributing
 The project uses: -
