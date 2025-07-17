@@ -75,7 +75,7 @@ The response should be a **200** and a **4XX** for errors: -
 ```
 
 It returns a **200** response with a `ping` string property that is `OK` if the
-authenticator is able to connect to the underlying (ISPyB) service. the string
+authenticator is able to connect to the underlying (ISPyB) service. The string
 is not `OK` if there are problems.
 
 ## Contributing
