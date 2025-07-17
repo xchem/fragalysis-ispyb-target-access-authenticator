@@ -324,6 +324,11 @@ def get_taa_user_tas(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Username cannot be '{_PING_CACHE_KEY}'",
         )
+    if username.startswith(_TIMESTAMP_KEY_PREFIX):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Username cannot begin with '{_TIMESTAMP_KEY_PREFIX}'",
+        )
     _LOGGER.debug("Request for '%s'", username)
 
     # FastAPI decodes url-encoded strings and memcached keys cannot contain spaces
