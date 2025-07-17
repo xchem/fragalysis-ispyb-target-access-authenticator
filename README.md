@@ -1,6 +1,6 @@
 # The Fragalysis ISPyB Target Access Authenticator
 
-![GitHub release (latest by date)](https://img.shields.io/github/v/release/xchem/fragalysis-ispyb-target-access-authenticator)
+![GitHub Release](https://img.shields.io/github/v/release/xchem/fragalysis-ispyb-target-access-authenticator?include_prereleases)
 
 [![build](https://github.com/xchem/fragalysis-ispyb-target-access-authenticator/actions/workflows/build.yaml/badge.svg)](https://github.com/xchem/fragalysis-ispyb-target-access-authenticator/actions/workflows/build.yaml)
 [![tag](https://github.com/xchem/fragalysis-ispyb-target-access-authenticator/actions/workflows/tag.yaml/badge.svg)](https://github.com/xchem/fragalysis-ispyb-target-access-authenticator/actions/workflows/tag.yaml)
