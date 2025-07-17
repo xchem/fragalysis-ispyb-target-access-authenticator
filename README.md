@@ -12,8 +12,15 @@
 [![Packaged with Poetry](https://img.shields.io/badge/packaging-poetry-cyan.svg)](https://python-poetry.org/)
 
 The ISPyB authenticator provides the Fragalysis Stack with a centralised service that
-can be utilised bny any number of stacks, and yields Target Access Strings based on User.
-It essentially replaces the stack internal **security** modules's ISPyB query mechanism.
+can be utilised by any number of stacks, and yields Target Access Strings based on User.
+The authenticator is designed to replace the stack's internal **security** module that is
+partly responsible for caching the regular SSH and MySQL ISPyB database access mechanism
+that restricts user access to objects in the stack based on their membership of *Proposals*
+and *Visits*.
+
+By providing an abstraction of the original security logic an administrator
+can replace the Pod with another offering its' own security implementation and so the
+stack's reliance omn ISPyB as a backing database is relaxed.
 
 The service is deployed into Kubernetes, typically in its own Namespace, along
 with a Service definition to allow in-cluster queries. By extracting the security
@@ -26,10 +33,11 @@ has a built-in (hard-coded) set of Target Access strings and users and it allows
 you to develop locally (offline) without needing to connect to any _real_
 underlying service.
 
-Any service implementation can be deployed, this one provides access to ISPyB
-using a container image based on Python and [FastAPI].
+Any service implementation can be deployed, this one provides remote (SSH) access to
+ISPyB using a container image based on Python and [FastAPI].
 
-The authentication logic's _contract_ requires the following endpoints: -
+The stack's _contract_ requires the following endpoints from any implementation
+of the authenticator: -
 
 -   `/version` **GET**
 
@@ -70,7 +78,8 @@ that are not known: -
 }
 ```
 
-It returns 'ping=OK' if the service is able to connect to the underlying ISPyB service.
+It returns a `ping` property that is `OK` if the service is able to connect to the
+underlying (ISPyB) service.
 
 ## Contributing
 The project uses: -
