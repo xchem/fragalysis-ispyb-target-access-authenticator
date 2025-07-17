@@ -43,12 +43,13 @@ That returns the following properties, each value being a string in a **200** re
 }
 ```
 
-A stack requests Target Access Strings based on URL-encoded username strings,
-and returns an array of Target Access Strings the user is entitles to access.
-The response should be a **200** and a **404** for usernames
-that are not known: -
-
 ### `/target-access/{username}` **GET**
+
+A stack requests Target Access Strings from the authenticator based on URL-encoded
+usernames, and the authenticator returns a count and an array of those the user is
+entitled to access.
+
+The response should be a **200** and a **4XX** for errors: -
 
 ```json
 {
@@ -59,8 +60,8 @@ that are not known: -
 
 >   For a query to be successful the client must provide a `X_TAAQueryKey` header value
     that matches the `TAA_QUERY_KEY` environment value supplied to the image.
-    This proves a crude but effective security mechanism that prevents queries without
-    providing a pre-defined key.
+    This proves a crude but effective protection mechanism that prevents queries from
+    clients that have not been supplied with the query key.
 
 ### `/ping` **GET**
 
@@ -70,8 +71,8 @@ that are not known: -
 }
 ```
 
-It returns a `ping` property that is `OK` if the service is able to connect to the
-underlying (ISPyB) service.
+It returns a `ping` string property that is `OK` if the service is able to connect to
+the underlying (ISPyB) service and something else if there are problems.
 
 ## Contributing
 The project uses: -
