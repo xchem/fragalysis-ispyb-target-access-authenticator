@@ -341,13 +341,10 @@ def get_taa_user_tas(
             detail="Encoded username exceeds 250 characters",
         )
 
-    # Get cached user data and any related timestamp.
-    user_timestamp_key: str = f"{_TIMESTAMP_KEY_PREFIX}{encoded_username}"
-    user_cache: set[str] = _MEMCACHED_CLIENT.get(encoded_username) or set()
-    user_cache_timestamp: datetime | None = _MEMCACHED_CLIENT.get(user_timestamp_key)
-
-    # If the user's cache is empty or the cache record is too old
+    # If the user's cache record is too old
     # (or there is no cache timestamp) then refresh the cache from the ISPyB DB.
+    user_timestamp_key: str = f"{_TIMESTAMP_KEY_PREFIX}{encoded_username}"
+    user_cache_timestamp: datetime | None = _MEMCACHED_CLIENT.get(user_timestamp_key)
     utc_now: datetime = _utc_now()
     if not user_cache_timestamp or utc_now - user_cache_timestamp > _MAX_USER_CACHE_AGE:
         _LOGGER.info("Attempting to refresh the cache for '%s'...", username)
@@ -364,9 +361,13 @@ def get_taa_user_tas(
         # We'll try this user again at the next expiry.
         _MEMCACHED_CLIENT.set(user_timestamp_key, utc_now)
 
+    # Cache is now valid (or empty)
+    user_cache: set[str] = _MEMCACHED_CLIENT.get(encoded_username) or set()
     count: int = len(user_cache)
+
     record: str = "record" if count == 1 else "records"
     _LOGGER.debug("Returning %s %s for '%s'", count, record, username)
+
     return TargetAccessGetUserTasResponse(
         count=count,
         target_access=user_cache,
