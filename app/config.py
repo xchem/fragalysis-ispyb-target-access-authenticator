@@ -14,7 +14,7 @@ class Config:
     ISPYB_PORT: int | None = int(os.environ.get("TAA_ISPYB_PORT", "0"))
     ISPYB_USER: str | None = os.environ.get("TAA_ISPYB_USER")
     ISPYB_PASSWORD: str | None = os.environ.get("TAA_ISPYB_PASSWORD")
-    ISPYB_DB: str = os.environ.get("TAA_ISPYB_DB", "db")
+    ISPYB_DB: str = os.environ.get("TAA_ISPYB_DB", "ispyb")
     ISPYB_CONN_INACTIVITY: int = int(os.environ.get("TAA_ISPYB_CONN_INACTIVITY", "360"))
 
     SSH_HOST: str | None = os.environ.get("TAA_SSH_HOST")
