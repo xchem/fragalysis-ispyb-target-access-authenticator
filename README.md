@@ -115,15 +115,20 @@ authenticate a user's access to Targets. It does this my communicating with a
 remote MySQL database over SSH using credentials provided by the following container
 environment variables: -
 
--   TAA_ISPYB_HOST
--   TAA_ISPYB_PORT
--   TAA_ISPYB_USER
--   TAA_ISPYB_PASSWORD
--   TAA_SSH_HOST
--   TAA_SSH_USER
--   TAA_SSH_PASSWORD or TAA_SSH_PRIVATE_KEY_FILENAME
+-   `TAA_ISPYB_HOST`
+-   `TAA_ISPYB_USER`
+-   `TAA_ISPYB_PASSWORD`
+-   `TAA_SSH_HOST`
+-   `TAA_SSH_USER`
+-   `TAA_SSH_PASSWORD` or `TAA_SSH_PRIVATE_KEY_FILENAME`
 
-If the TAA_SSH_PRIVATE_KEY_FILENAME is used (rather than TAA_SSH_PASSWORD) you are expected
+Other variables with (sensible) defaults are: -
+
+-   `TAA_ISPYB_DB` (**"ispyb"**)
+-   `TAA_ISPYB_PORT` (**"4306"**)
+-   `TAA_ISPYB_CONN_INACTIVITY` (**"360"**)
+
+If the `TAA_SSH_PRIVATE_KEY_FILENAME` is used (rather than `TAA_SSH_PASSWORD`) you are expected
 to have mapped the SSH key file into the container.
 
 Two types of records are cached for each user, one using the url-encoded username as
@@ -135,8 +140,8 @@ The ISpyB database is queried if there are no records for a user or exiting reco
 are too old. The maximum age of cached results is based on the number of minutes set
 in the following container environment variables: -
 
--   TAA_CACHE_EXPIRY_MINUTES (default of 2)
--   TAA_PING_CACHE_EXPIRY_SECONDS (default 25 seconds)
+-   `TAA_CACHE_EXPIRY_MINUTES` (default of **"2"**)
+-   `TAA_PING_CACHE_EXPIRY_SECONDS` (default **"25"** seconds)
 
 The authenticator also caches the `/ping` response as a ping requires the authenticator
 to query the ISPyB database.
