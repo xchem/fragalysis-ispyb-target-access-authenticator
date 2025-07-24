@@ -17,7 +17,7 @@ from fastapi import (
 )
 from ispyb.exception import ISPyBConnectionException, ISPyBNoResultException
 from pydantic import BaseModel
-from pymemcache.client.base import PooledClient
+from pymemcache.client.base import Client
 from pymemcache.client.retrying import RetryingClient
 from pymemcache.exceptions import MemcacheUnexpectedCloseError
 
@@ -86,34 +86,9 @@ class TaSerde:
         assert False
 
 
-# The location is either a host ("localhost") or host and port ("localhost:1234").
-# If the port is not the expected default of 11211 is assumed.
-_MEMCACHED_BASE_CLIENT: PooledClient = PooledClient(
-    Config.MEMCACHED_LOCATION,
-    max_pool_size=8,
-    connect_timeout=4,
-    timeout=0.5,
-    ignore_exc=True,
-    serde=TaSerde(),
-)
-_MEMCACHED_CLIENT: RetryingClient = RetryingClient(
-    _MEMCACHED_BASE_CLIENT,
-    attempts=5,
-    retry_delay=0.5,
-    retry_for=[MemcacheUnexpectedCloseError],
-)
-
-
 def _utc_now() -> datetime:
     """Get the current time (UTC)."""
     return datetime.now(timezone.utc)
-
-
-# Inject some mock data for "dave lister"?
-if Config.ENABLE_DAVE_LISTER:
-    _DUMMY_USER: str = quote("dave lister")
-    _MEMCACHED_CLIENT.set(_DUMMY_USER, set(["sb99999-9"]))
-    _MEMCACHED_CLIENT.set(f"{_TIMESTAMP_KEY_PREFIX}{_DUMMY_USER}", _utc_now())
 
 
 # Do we have sufficient configuration for an SSH connector?
@@ -163,6 +138,24 @@ class TargetAccessGetUserTasResponse(BaseModel):
     count: int
     # Possibly empty list of Target Access strings
     target_access: list[str]
+
+
+def _get_memcached_retrying_client() -> RetryingClient:
+    # The location is either a host ("localhost") or host and port ("localhost:1234").
+    # If the port is not the expected default of 11211 is assumed.
+    base_client: Client = Client(
+        Config.MEMCACHED_LOCATION,
+        connect_timeout=4,
+        timeout=0.5,
+        ignore_exc=True,
+        serde=TaSerde(),
+    )
+    return RetryingClient(
+        base_client,
+        attempts=5,
+        retry_delay=0.5,
+        retry_for=[MemcacheUnexpectedCloseError],
+    )
 
 
 def _get_connector() -> SSHConnector | None:
@@ -271,20 +264,22 @@ def _cache_get_datetime(key: str) -> datetime:
     response: datetime = _utc_now()
     err: str | None = None
     err_msg: str | None = None
-    try:
-        response = _MEMCACHED_CLIENT.get(key)
-    except AssertionError as a_err:
-        err = a_err.__class__.__name__
-        err_msg = str(a_err)
-    except KeyError as k_err:
-        err = k_err.__class__.__name__
-        err_msg = str(k_err)
-    except TimeoutError as t_err:
-        err = t_err.__class__.__name__
-        err_msg = str(t_err)
-    except OSError as o_err:
-        err = o_err.__class__.__name__
-        err_msg = str(o_err)
+
+    with _get_memcached_retrying_client() as client:
+        try:
+            response = client.get(key)
+        except AssertionError as a_err:
+            err = a_err.__class__.__name__
+            err_msg = str(a_err)
+        except KeyError as k_err:
+            err = k_err.__class__.__name__
+            err_msg = str(k_err)
+        except TimeoutError as t_err:
+            err = t_err.__class__.__name__
+            err_msg = str(t_err)
+        except OSError as o_err:
+            err = o_err.__class__.__name__
+            err_msg = str(o_err)
 
     if err:
         _LOGGER.warning("Cache %s with %s datetime (%s)", err, key, err_msg)
@@ -297,20 +292,22 @@ def _cache_get_str(key: str) -> str:
     response: str = ""
     err: str | None = None
     err_msg: str | None = None
-    try:
-        response = _MEMCACHED_CLIENT.get(key)
-    except AssertionError as a_err:
-        err = a_err.__class__.__name__
-        err_msg = str(a_err)
-    except KeyError as k_err:
-        err = k_err.__class__.__name__
-        err_msg = str(k_err)
-    except TimeoutError as t_err:
-        err = t_err.__class__.__name__
-        err_msg = str(t_err)
-    except OSError as o_err:
-        err = o_err.__class__.__name__
-        err_msg = str(o_err)
+
+    with _get_memcached_retrying_client() as client:
+        try:
+            response = client.get(key)
+        except AssertionError as a_err:
+            err = a_err.__class__.__name__
+            err_msg = str(a_err)
+        except KeyError as k_err:
+            err = k_err.__class__.__name__
+            err_msg = str(k_err)
+        except TimeoutError as t_err:
+            err = t_err.__class__.__name__
+            err_msg = str(t_err)
+        except OSError as o_err:
+            err = o_err.__class__.__name__
+            err_msg = str(o_err)
 
     if err:
         _LOGGER.warning("Cache %s with %s str (%s)", err, key, err_msg)
@@ -323,25 +320,35 @@ def _cache_get_set(key: str) -> set[str]:
     response: set[str] = set()
     err: str | None = None
     err_msg: str | None = None
-    try:
-        response = _MEMCACHED_CLIENT.get(key)
-    except AssertionError as a_err:
-        err = a_err.__class__.__name__
-        err_msg = str(a_err)
-    except KeyError as k_err:
-        err = k_err.__class__.__name__
-        err_msg = str(k_err)
-    except TimeoutError as t_err:
-        err = t_err.__class__.__name__
-        err_msg = str(t_err)
-    except OSError as o_err:
-        err = o_err.__class__.__name__
-        err_msg = str(o_err)
+
+    with _get_memcached_retrying_client() as client:
+        try:
+            response = client.get(key)
+        except AssertionError as a_err:
+            err = a_err.__class__.__name__
+            err_msg = str(a_err)
+        except KeyError as k_err:
+            err = k_err.__class__.__name__
+            err_msg = str(k_err)
+        except TimeoutError as t_err:
+            err = t_err.__class__.__name__
+            err_msg = str(t_err)
+        except OSError as o_err:
+            err = o_err.__class__.__name__
+            err_msg = str(o_err)
 
     if err:
         _LOGGER.warning("Cache %s with %s set (%s)", err, key, err_msg)
 
     return response
+
+
+# Inject some mock data for "dave lister"?
+if Config.ENABLE_DAVE_LISTER:
+    _DUMMY_USER: str = quote("dave lister")
+    with _get_memcached_retrying_client() as dummy_user_client:
+        dummy_user_client.set(_DUMMY_USER, set(["sb99999-9"]))
+        dummy_user_client.set(f"{_TIMESTAMP_KEY_PREFIX}{_DUMMY_USER}", _utc_now())
 
 
 # Endpoints (in-cluster) for the ISPyP Authenticator -----------------------------------
@@ -375,8 +382,9 @@ def ping():
             ssh_connector.server.stop()
             ping_status_str = "OK"
         _LOGGER.debug("ISPyB PING [%s]", ping_status_str)
-        _MEMCACHED_CLIENT.set(_PING_CACHE_KEY, ping_status_str)
-        _MEMCACHED_CLIENT.set(_PING_CACHE_TIMESTAMP_KEY, utc_now)
+        with _get_memcached_retrying_client() as client:
+            client.set(_PING_CACHE_KEY, ping_status_str)
+            client.set(_PING_CACHE_TIMESTAMP_KEY, utc_now)
     else:
         # Ping has not expired and should be set to something...
         ping_status_str = _cache_get_str(_PING_CACHE_KEY)
@@ -441,8 +449,9 @@ def get_taa_user_tas(
         # Reset the user's cache timestamp regardless of success.
         # We'll try this user again at the next expiry.
         _LOGGER.info("New cache for '%s' (size=%d)", username, len(user_cache))
-        _MEMCACHED_CLIENT.set(encoded_username, user_cache)
-        _MEMCACHED_CLIENT.set(user_timestamp_key, utc_now)
+        with _get_memcached_retrying_client() as client:
+            client.set(encoded_username, user_cache)
+            client.set(user_timestamp_key, utc_now)
     else:
         # Cache has not expired and should be set to something...
         user_cache = _cache_get_set(encoded_username)
