@@ -351,7 +351,7 @@ def ping():
         client.close()
 
         if status_str != pre_ping_status:
-            _LOGGER.info("New ISPyB PING status [%s]", status_str)
+            _LOGGER.info("New ISPyB PING status [%s->%s]", pre_ping_status, status_str)
 
     return TargetAccessGetPingResponse(ping=status_str)
 
