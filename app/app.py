@@ -17,7 +17,7 @@ from fastapi import (
 )
 from ispyb.exception import ISPyBConnectionException, ISPyBNoResultException
 from pydantic import BaseModel
-from pymemcache.client.base import Client, KeepaliveOpts
+from pymemcache.client.base import PooledClient
 from pymemcache.client.retrying import RetryingClient
 from pymemcache.exceptions import MemcacheUnexpectedCloseError
 
@@ -65,43 +65,41 @@ _MAX_PING_CACHE_AGE: timedelta = timedelta(seconds=Config.PING_CACHE_EXPIRY_SECO
 # We use custom serialisers to convert our list of strings
 # to/from a string (which is the memcached native value type).
 # Memcached value size if limited to 1MB - about 90_000 TAS strings?
-def _set_serialiser(key, value):
-    del key
-    if isinstance(value, str):
-        return (value, 1)
-    if isinstance(value, datetime):
-        return (str(value), 2)
-    return (repr(value), 3)
+class TaSerde:
+    def serialize(self, key, value):
+        del key
+        if isinstance(value, str):
+            return (value, 1)
+        if isinstance(value, datetime):
+            return (str(value), 2)
+        return (repr(value), 3)
 
-
-def _set_deserialiser(key, value, flags):
-    del key
-    if flags == 1:
-        return value
-    if flags == 2:
-        return parse(value)
-    if flags == 3:
-        return eval(value)  # pylint: disable=eval-used
-    # How did we get here?
-    assert False
+    def deserialize(self, key, value, flags):
+        del key
+        if flags == 1:
+            return value
+        if flags == 2:
+            return parse(value)
+        if flags == 3:
+            return eval(value)  # pylint: disable=eval-used
+        # How did we get here?
+        assert False
 
 
 # The location is either a host ("localhost") or host and port ("localhost:1234").
 # If the port is not the expected default of 11211 is assumed.
-_MEMCACHED_KEEPALIVE: KeepaliveOpts = KeepaliveOpts(idle=35, intvl=8, cnt=5)
-_MEMCACHED_BASE_CLIENT: Client = Client(
+_MEMCACHED_BASE_CLIENT: PooledClient = PooledClient(
     Config.MEMCACHED_LOCATION,
+    max_pool_size=8,
     connect_timeout=4,
-    encoding="utf-8",
     timeout=0.5,
-    socket_keepalive=_MEMCACHED_KEEPALIVE,
-    serializer=_set_serialiser,
-    deserializer=_set_deserialiser,
+    ignore_exc=True,
+    serde=TaSerde(),
 )
 _MEMCACHED_CLIENT: RetryingClient = RetryingClient(
     _MEMCACHED_BASE_CLIENT,
-    attempts=3,
-    retry_delay=0.01,
+    attempts=5,
+    retry_delay=0.5,
     retry_for=[MemcacheUnexpectedCloseError],
 )
 
@@ -268,6 +266,84 @@ def _get_tas_from_remote_ispyb(username: str) -> set[str] | None:
     return prop_id_set
 
 
+def _cache_get_datetime(key: str) -> datetime:
+    """Common memcached get() logic."""
+    response: datetime = _utc_now()
+    err: str | None = None
+    err_msg: str | None = None
+    try:
+        response = _MEMCACHED_CLIENT.get(key)
+    except AssertionError as a_err:
+        err = a_err.__class__.__name__
+        err_msg = str(a_err)
+    except KeyError as k_err:
+        err = k_err.__class__.__name__
+        err_msg = str(k_err)
+    except TimeoutError as t_err:
+        err = t_err.__class__.__name__
+        err_msg = str(t_err)
+    except OSError as o_err:
+        err = o_err.__class__.__name__
+        err_msg = str(o_err)
+
+    if err:
+        _LOGGER.warning("Cache %s with %s datetime (%s)", err, key, err_msg)
+
+    return response
+
+
+def _cache_get_str(key: str) -> str:
+    """Common memcached get() logic."""
+    response: str = ""
+    err: str | None = None
+    err_msg: str | None = None
+    try:
+        response = _MEMCACHED_CLIENT.get(key)
+    except AssertionError as a_err:
+        err = a_err.__class__.__name__
+        err_msg = str(a_err)
+    except KeyError as k_err:
+        err = k_err.__class__.__name__
+        err_msg = str(k_err)
+    except TimeoutError as t_err:
+        err = t_err.__class__.__name__
+        err_msg = str(t_err)
+    except OSError as o_err:
+        err = o_err.__class__.__name__
+        err_msg = str(o_err)
+
+    if err:
+        _LOGGER.warning("Cache %s with %s str (%s)", err, key, err_msg)
+
+    return response
+
+
+def _cache_get_set(key: str) -> set[str]:
+    """Common memcached get() logic."""
+    response: set[str] = set()
+    err: str | None = None
+    err_msg: str | None = None
+    try:
+        response = _MEMCACHED_CLIENT.get(key)
+    except AssertionError as a_err:
+        err = a_err.__class__.__name__
+        err_msg = str(a_err)
+    except KeyError as k_err:
+        err = k_err.__class__.__name__
+        err_msg = str(k_err)
+    except TimeoutError as t_err:
+        err = t_err.__class__.__name__
+        err_msg = str(t_err)
+    except OSError as o_err:
+        err = o_err.__class__.__name__
+        err_msg = str(o_err)
+
+    if err:
+        _LOGGER.warning("Cache %s with %s set (%s)", err, key, err_msg)
+
+    return response
+
+
 # Endpoints (in-cluster) for the ISPyP Authenticator -----------------------------------
 
 
@@ -289,7 +365,7 @@ def ping():
     # Throttle /ping requests by only querying the underlying service
     # if there's no cached ping result or it's too old...
     utc_now: datetime = _utc_now()
-    ping_cache_timestamp: datetime | None = _MEMCACHED_CLIENT.get(
+    ping_cache_timestamp: datetime | None = _cache_get_datetime(
         _PING_CACHE_TIMESTAMP_KEY
     )
     ping_status_str: str = "NOT OK"
@@ -303,7 +379,7 @@ def ping():
         _MEMCACHED_CLIENT.set(_PING_CACHE_TIMESTAMP_KEY, utc_now)
     else:
         # Ping has not expired and should be set to something...
-        ping_status_str = _MEMCACHED_CLIENT.get(_PING_CACHE_KEY)
+        ping_status_str = _cache_get_str(_PING_CACHE_KEY)
 
     return TargetAccessGetPingResponse(ping=ping_status_str)
 
@@ -349,7 +425,7 @@ def get_taa_user_tas(
     # If the user's cache record is too old
     # (or there is no cache timestamp) then refresh the cache from the ISPyB DB.
     user_timestamp_key: str = f"{_TIMESTAMP_KEY_PREFIX}{encoded_username}"
-    user_cache_timestamp: datetime | None = _MEMCACHED_CLIENT.get(user_timestamp_key)
+    user_cache_timestamp: datetime = _cache_get_datetime(user_timestamp_key)
     utc_now: datetime = _utc_now()
     user_cache: set[str] = set()
     if not user_cache_timestamp or utc_now - user_cache_timestamp > _MAX_USER_CACHE_AGE:
@@ -369,7 +445,7 @@ def get_taa_user_tas(
         _MEMCACHED_CLIENT.set(user_timestamp_key, utc_now)
     else:
         # Cache has not expired and should be set to something...
-        user_cache = _MEMCACHED_CLIENT.get(encoded_username)
+        user_cache = _cache_get_set(encoded_username)
 
     count: int = len(user_cache)
     record: str = "record" if count == 1 else "records"
