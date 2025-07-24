@@ -396,7 +396,7 @@ def ping():
             if ssh_connector := _get_connector():
                 ssh_connector.server.stop()
                 ping_status_str = "OK"
-            _LOGGER.debug("ISPyB PING [%s]", ping_status_str)
+            _LOGGER.info("New ISPyB PING [%s]", ping_status_str)
             client: RetryingClient = _get_memcached_retrying_client()
             assert client
             client.set(_PING_CACHE_KEY, ping_status_str)
