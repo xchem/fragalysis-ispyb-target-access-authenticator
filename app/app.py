@@ -202,7 +202,7 @@ def _get_tas_from_remote_ispyb(username: str) -> set[str] | None:
     try:
         rs = ssh_connector.core.retrieve_sessions_for_person_login(username)
     except ISPyBNoResultException:
-        _LOGGER.warning("No results for user '%s'", username)
+        _LOGGER.debug("ISPyBNoResultException for user '%s'", username)
         rs = []
     # Request done, always stop the server
     if ssh_connector.server:
@@ -212,7 +212,7 @@ def _get_tas_from_remote_ispyb(username: str) -> set[str] | None:
     if rs is None:
         return None
     if not rs:
-        _LOGGER.warning("No results for user '%s'", username)
+        _LOGGER.debug("No results for user '%s'", username)
         return prop_id_set
 
     # Typically you'll find the following fields in each item
@@ -292,18 +292,20 @@ def ping():
     ping_cache_timestamp: datetime | None = _MEMCACHED_CLIENT.get(
         _PING_CACHE_TIMESTAMP_KEY
     )
+    ping_status_str: str = "NOT OK"
     if not ping_cache_timestamp or utc_now - ping_cache_timestamp > _MAX_PING_CACHE_AGE:
         _LOGGER.debug("ping cache value is too old - refreshing...")
-        ping_status_str: str = "OK"
         if ssh_connector := _get_connector():
             ssh_connector.server.stop()
-        else:
-            ping_status_str = "NOT OK"
-        _LOGGER.info("ISPyB PING [%s]", ping_status_str)
+            ping_status_str = "OK"
+        _LOGGER.debug("ISPyB PING [%s]", ping_status_str)
         _MEMCACHED_CLIENT.set(_PING_CACHE_KEY, ping_status_str)
         _MEMCACHED_CLIENT.set(_PING_CACHE_TIMESTAMP_KEY, utc_now)
+    else:
+        # Ping has not expired and should be set to something...
+        ping_status_str = _MEMCACHED_CLIENT.get(_PING_CACHE_KEY)
 
-    return TargetAccessGetPingResponse(ping=_MEMCACHED_CLIENT.get(_PING_CACHE_KEY))
+    return TargetAccessGetPingResponse(ping=ping_status_str)
 
 
 @app.get("/target-access/{username}", status_code=status.HTTP_200_OK)
