@@ -171,15 +171,15 @@ def _get_connector() -> SSHConnector | None:
     """Tries to create an SSHConnector(), which may fail."""
     conn: SSHConnector | None = None
     if _SSH_CONNECTOR_CONFIGURED:
-        _LOGGER.info("Creating SSHConnector() for '%s'..", Config.SSH_HOST)
+        _LOGGER.debug("Creating SSHConnector() for '%s'..", Config.SSH_HOST)
         try:
             conn = SSHConnector()
         except ISPyBConnectionException:
             # The ISPyB connection failed.
             # Nothing else to do here, metrics are already updated
-            _LOGGER.info("ISPyB connection failure")
+            _LOGGER.warning("ISPyB connection failure")
         except sshtunnel.BaseSSHTunnelForwarderError:
-            _LOGGER.info("Failed to establish a connector")
+            _LOGGER.warning("Failed to establish a connector")
     else:
         _LOGGER.debug("Insufficient configuration to create a connector")
 
@@ -347,14 +347,14 @@ def get_taa_user_tas(
     user_cache_timestamp: datetime | None = _MEMCACHED_CLIENT.get(user_timestamp_key)
     utc_now: datetime = _utc_now()
     if not user_cache_timestamp or utc_now - user_cache_timestamp > _MAX_USER_CACHE_AGE:
-        _LOGGER.info("Attempting to refresh the cache for '%s'...", username)
+        _LOGGER.debug("Attempting to refresh the cache for '%s'...", username)
         new_tas_set: set[str] | None = _get_tas_from_remote_ispyb(username=username)
         if new_tas_set is not None:
             # Success.
             # An empty list is considered successful - it means the user is known
             # but does not have access to any proposals/visits.
             _MEMCACHED_CLIENT.set(encoded_username, new_tas_set)
-            _LOGGER.info("Cache for '%s' set (%s)", username, len(new_tas_set))
+            _LOGGER.info("New cache for '%s' set (%s)", username, len(new_tas_set))
         else:
             _LOGGER.warning("Failed to get TAS set for '%s'", username)
         # Reset the user's cache timestamp regardless of success.

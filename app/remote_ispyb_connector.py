@@ -131,7 +131,7 @@ class SSHConnector(Connector):
                 if connect_attempts == 0:
                     # So we only log our connection attempts once
                     # an error has occurred - to avoid flooding the log
-                    logger.info(
+                    logger.debug(
                         "Connecting to MySQL database (db_user=%s db_name=%s)...",
                         db_user,
                         db_name,
@@ -144,7 +144,7 @@ class SSHConnector(Connector):
                 if connect_attempts == 0:
                     # So we only log our connection attempts once
                     # an error has occurred - to avoid flooding the log
-                    logger.info(
+                    logger.debug(
                         "Connecting to MySQL database (db_user=%s db_name=%s)...",
                         db_user,
                         db_name,
@@ -156,12 +156,12 @@ class SSHConnector(Connector):
 
         if self.conn is not None:
             if connect_attempts > 0:
-                logger.info("Connected")
+                logger.debug("Connected")
             PrometheusMetrics.new_ispyb_connection()
             self.conn.autocommit = True
         else:
             if connect_attempts > 0:
-                logger.info("Failed to connect")
+                logger.warning("Failed to connect")
             PrometheusMetrics.failed_ispyb_connection()
             self.server.stop()
             raise ISPyBConnectionException
