@@ -265,22 +265,24 @@ def _cache_get_datetime(key: str) -> datetime:
     err: str | None = None
     err_msg: str | None = None
 
-    with _get_memcached_retrying_client() as client:
-        try:
-            response = client.get(key)
-        except AssertionError as a_err:
-            err = a_err.__class__.__name__
-            err_msg = str(a_err)
-        except KeyError as k_err:
-            err = k_err.__class__.__name__
-            err_msg = str(k_err)
-        except TimeoutError as t_err:
-            err = t_err.__class__.__name__
-            err_msg = str(t_err)
-        except OSError as o_err:
-            err = o_err.__class__.__name__
-            err_msg = str(o_err)
+    client: RetryingClient = _get_memcached_retrying_client()
+    assert client
+    try:
+        response = client.get(key)
+    except AssertionError as a_err:
+        err = a_err.__class__.__name__
+        err_msg = str(a_err)
+    except KeyError as k_err:
+        err = k_err.__class__.__name__
+        err_msg = str(k_err)
+    except TimeoutError as t_err:
+        err = t_err.__class__.__name__
+        err_msg = str(t_err)
+    except OSError as o_err:
+        err = o_err.__class__.__name__
+        err_msg = str(o_err)
 
+    client.close()
     if err:
         _LOGGER.warning("Cache %s with %s datetime (%s)", err, key, err_msg)
 
@@ -293,22 +295,24 @@ def _cache_get_str(key: str) -> str:
     err: str | None = None
     err_msg: str | None = None
 
-    with _get_memcached_retrying_client() as client:
-        try:
-            response = client.get(key)
-        except AssertionError as a_err:
-            err = a_err.__class__.__name__
-            err_msg = str(a_err)
-        except KeyError as k_err:
-            err = k_err.__class__.__name__
-            err_msg = str(k_err)
-        except TimeoutError as t_err:
-            err = t_err.__class__.__name__
-            err_msg = str(t_err)
-        except OSError as o_err:
-            err = o_err.__class__.__name__
-            err_msg = str(o_err)
+    client: RetryingClient = _get_memcached_retrying_client()
+    assert client
+    try:
+        response = client.get(key)
+    except AssertionError as a_err:
+        err = a_err.__class__.__name__
+        err_msg = str(a_err)
+    except KeyError as k_err:
+        err = k_err.__class__.__name__
+        err_msg = str(k_err)
+    except TimeoutError as t_err:
+        err = t_err.__class__.__name__
+        err_msg = str(t_err)
+    except OSError as o_err:
+        err = o_err.__class__.__name__
+        err_msg = str(o_err)
 
+    client.close()
     if err:
         _LOGGER.warning("Cache %s with %s str (%s)", err, key, err_msg)
 
@@ -321,22 +325,24 @@ def _cache_get_set(key: str) -> set[str]:
     err: str | None = None
     err_msg: str | None = None
 
-    with _get_memcached_retrying_client() as client:
-        try:
-            response = client.get(key)
-        except AssertionError as a_err:
-            err = a_err.__class__.__name__
-            err_msg = str(a_err)
-        except KeyError as k_err:
-            err = k_err.__class__.__name__
-            err_msg = str(k_err)
-        except TimeoutError as t_err:
-            err = t_err.__class__.__name__
-            err_msg = str(t_err)
-        except OSError as o_err:
-            err = o_err.__class__.__name__
-            err_msg = str(o_err)
+    client: RetryingClient = _get_memcached_retrying_client()
+    assert client
+    try:
+        response = client.get(key)
+    except AssertionError as a_err:
+        err = a_err.__class__.__name__
+        err_msg = str(a_err)
+    except KeyError as k_err:
+        err = k_err.__class__.__name__
+        err_msg = str(k_err)
+    except TimeoutError as t_err:
+        err = t_err.__class__.__name__
+        err_msg = str(t_err)
+    except OSError as o_err:
+        err = o_err.__class__.__name__
+        err_msg = str(o_err)
 
+    client.close()
     if err:
         _LOGGER.warning("Cache %s with %s set (%s)", err, key, err_msg)
 
@@ -346,9 +352,11 @@ def _cache_get_set(key: str) -> set[str]:
 # Inject some mock data for "dave lister"?
 if Config.ENABLE_DAVE_LISTER:
     _DUMMY_USER: str = quote("dave lister")
-    with _get_memcached_retrying_client() as dummy_user_client:
-        dummy_user_client.set(_DUMMY_USER, set(["sb99999-9"]))
-        dummy_user_client.set(f"{_TIMESTAMP_KEY_PREFIX}{_DUMMY_USER}", _utc_now())
+    dummy_user_client: RetryingClient = _get_memcached_retrying_client()
+    assert dummy_user_client
+    dummy_user_client.set(_DUMMY_USER, set(["sb99999-9"]))
+    dummy_user_client.set(f"{_TIMESTAMP_KEY_PREFIX}{_DUMMY_USER}", _utc_now())
+    dummy_user_client.close()
 
 
 # Endpoints (in-cluster) for the ISPyP Authenticator -----------------------------------
@@ -382,9 +390,11 @@ def ping():
             ssh_connector.server.stop()
             ping_status_str = "OK"
         _LOGGER.debug("ISPyB PING [%s]", ping_status_str)
-        with _get_memcached_retrying_client() as client:
-            client.set(_PING_CACHE_KEY, ping_status_str)
-            client.set(_PING_CACHE_TIMESTAMP_KEY, utc_now)
+        client: RetryingClient = _get_memcached_retrying_client()
+        assert client
+        client.set(_PING_CACHE_KEY, ping_status_str)
+        client.set(_PING_CACHE_TIMESTAMP_KEY, utc_now)
+        client.close()
     else:
         # Ping has not expired and should be set to something...
         ping_status_str = _cache_get_str(_PING_CACHE_KEY)
@@ -449,9 +459,10 @@ def get_taa_user_tas(
         # Reset the user's cache timestamp regardless of success.
         # We'll try this user again at the next expiry.
         _LOGGER.info("New cache for '%s' (size=%d)", username, len(user_cache))
-        with _get_memcached_retrying_client() as client:
-            client.set(encoded_username, user_cache)
-            client.set(user_timestamp_key, utc_now)
+        client: RetryingClient = _get_memcached_retrying_client()
+        client.set(encoded_username, user_cache)
+        client.set(user_timestamp_key, utc_now)
+        client.close()
     else:
         # Cache has not expired and should be set to something...
         user_cache = _cache_get_set(encoded_username)
