@@ -55,7 +55,7 @@ _MAX_USER_CACHE_AGE: timedelta = timedelta(minutes=Config.CACHE_EXPIRY_MINUTES)
 # The memcached key for the Ping cache (and its timestamp)
 # This cannot be mistaken for a username - and we check this
 # early in the /target-access endpoint. the
-_PING_CACHE_KEY: str = "-"
+_PING_CACHE_KEY: str = "ispyb-ping"
 _PING_CACHE_TIMESTAMP_KEY: str = f"{_TIMESTAMP_KEY_PREFIX}{_PING_CACHE_KEY}"
 _MAX_PING_CACHE_AGE: timedelta = timedelta(seconds=Config.PING_CACHE_EXPIRY_SECONDS)
 
@@ -329,6 +329,7 @@ def get_taa_user_tas(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Username cannot begin with '{_TIMESTAMP_KEY_PREFIX}'",
         )
+
     _LOGGER.debug("Request for '%s'", username)
 
     # FastAPI decodes url-encoded strings and memcached keys cannot contain spaces
