@@ -294,11 +294,13 @@ def ping():
     )
     if not ping_cache_timestamp or utc_now - ping_cache_timestamp > _MAX_PING_CACHE_AGE:
         _LOGGER.debug("ping cache value is too old - refreshing...")
+        ping_status_str: str = "OK"
         if ssh_connector := _get_connector():
             ssh_connector.server.stop()
-            _MEMCACHED_CLIENT.set(_PING_CACHE_KEY, "OK")
         else:
-            _MEMCACHED_CLIENT.set(_PING_CACHE_KEY, "NOT OK")
+            ping_status_str = "NOT OK"
+        _LOGGER.info("ISPyB PING [%s]", ping_status_str)
+        _MEMCACHED_CLIENT.set(_PING_CACHE_KEY, ping_status_str)
         _MEMCACHED_CLIENT.set(_PING_CACHE_TIMESTAMP_KEY, utc_now)
 
     return TargetAccessGetPingResponse(ping=_MEMCACHED_CLIENT.get(_PING_CACHE_KEY))
@@ -347,25 +349,27 @@ def get_taa_user_tas(
     user_timestamp_key: str = f"{_TIMESTAMP_KEY_PREFIX}{encoded_username}"
     user_cache_timestamp: datetime | None = _MEMCACHED_CLIENT.get(user_timestamp_key)
     utc_now: datetime = _utc_now()
+    user_cache: set[str] = set()
     if not user_cache_timestamp or utc_now - user_cache_timestamp > _MAX_USER_CACHE_AGE:
         _LOGGER.debug("Attempting to refresh the cache for '%s'...", username)
-        new_tas_set: set[str] | None = _get_tas_from_remote_ispyb(username=username)
-        if new_tas_set is not None:
-            # Success.
+        remote_tas_set: set[str] | None = _get_tas_from_remote_ispyb(username=username)
+        if remote_tas_set is not None:
+            # Got something (may be empty).
             # An empty list is considered successful - it means the user is known
             # but does not have access to any proposals/visits.
-            _MEMCACHED_CLIENT.set(encoded_username, new_tas_set)
-            _LOGGER.info("New cache for '%s' set (%s)", username, len(new_tas_set))
+            user_cache = remote_tas_set
         else:
             _LOGGER.warning("Failed to get TAS set for '%s'", username)
         # Reset the user's cache timestamp regardless of success.
         # We'll try this user again at the next expiry.
+        _LOGGER.info("New cache for '%s' (size=%d)", username, len(user_cache))
+        _MEMCACHED_CLIENT.set(encoded_username, user_cache)
         _MEMCACHED_CLIENT.set(user_timestamp_key, utc_now)
+    else:
+        # Cache has not expired and should be set to something...
+        user_cache = _MEMCACHED_CLIENT.get(encoded_username)
 
-    # Cache is now valid (or empty)
-    user_cache: set[str] = _MEMCACHED_CLIENT.get(encoded_username) or set()
     count: int = len(user_cache)
-
     record: str = "record" if count == 1 else "records"
     _LOGGER.debug("Returning %s %s for '%s'", count, record, username)
 
