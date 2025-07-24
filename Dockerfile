@@ -53,7 +53,7 @@ WORKDIR ${APP_ROOT}
 # Workers (processes)
 ENV WORKERS=1
 # Concurrency (per worker)
-ENV CONCURRENCY=1
+ENV CONCURRENCY=4
 
 # Start the application
 CMD ["./docker-entrypoint.sh"]

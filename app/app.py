@@ -2,6 +2,7 @@
 
 import json
 import logging
+import multiprocessing
 from datetime import datetime, timedelta, timezone
 from logging.config import dictConfig
 from typing import Annotated, Any
@@ -36,6 +37,8 @@ dictConfig(_LOGGING_CONFIG)
 print("Configured logging.")
 
 _LOGGER = logging.getLogger(__name__)
+
+_SEMAPHORE = multiprocessing.Semaphore()
 
 app = FastAPI()
 
@@ -377,27 +380,31 @@ def ping():
     """Returns 'OK' if we can communicate with the underlying ISPyB service
     (i.e. create a connector). Anything other than 'OK' indicates a problem.
     """
-    # Throttle /ping requests by only querying the underlying service
-    # if there's no cached ping result or it's too old...
-    utc_now: datetime = _utc_now()
-    ping_cache_timestamp: datetime | None = _cache_get_datetime(
-        _PING_CACHE_TIMESTAMP_KEY
-    )
-    ping_status_str: str = "NOT OK"
-    if not ping_cache_timestamp or utc_now - ping_cache_timestamp > _MAX_PING_CACHE_AGE:
-        _LOGGER.debug("ping cache value is too old - refreshing...")
-        if ssh_connector := _get_connector():
-            ssh_connector.server.stop()
-            ping_status_str = "OK"
-        _LOGGER.debug("ISPyB PING [%s]", ping_status_str)
-        client: RetryingClient = _get_memcached_retrying_client()
-        assert client
-        client.set(_PING_CACHE_KEY, ping_status_str)
-        client.set(_PING_CACHE_TIMESTAMP_KEY, utc_now)
-        client.close()
-    else:
-        # Ping has not expired and should be set to something...
-        ping_status_str = _cache_get_str(_PING_CACHE_KEY)
+    with _SEMAPHORE:
+        # Throttle /ping requests by only querying the underlying service
+        # if there's no cached ping result or it's too old...
+        utc_now: datetime = _utc_now()
+        ping_cache_timestamp: datetime | None = _cache_get_datetime(
+            _PING_CACHE_TIMESTAMP_KEY
+        )
+        ping_status_str: str = "NOT OK"
+        if (
+            not ping_cache_timestamp
+            or utc_now - ping_cache_timestamp > _MAX_PING_CACHE_AGE
+        ):
+            _LOGGER.debug("ping cache value is too old - refreshing...")
+            if ssh_connector := _get_connector():
+                ssh_connector.server.stop()
+                ping_status_str = "OK"
+            _LOGGER.debug("ISPyB PING [%s]", ping_status_str)
+            client: RetryingClient = _get_memcached_retrying_client()
+            assert client
+            client.set(_PING_CACHE_KEY, ping_status_str)
+            client.set(_PING_CACHE_TIMESTAMP_KEY, utc_now)
+            client.close()
+        else:
+            # Ping has not expired and should be set to something...
+            ping_status_str = _cache_get_str(_PING_CACHE_KEY)
 
     return TargetAccessGetPingResponse(ping=ping_status_str)
 
@@ -440,32 +447,38 @@ def get_taa_user_tas(
             detail="Encoded username exceeds 250 characters",
         )
 
-    # If the user's cache record is too old
-    # (or there is no cache timestamp) then refresh the cache from the ISPyB DB.
-    user_timestamp_key: str = f"{_TIMESTAMP_KEY_PREFIX}{encoded_username}"
-    user_cache_timestamp: datetime = _cache_get_datetime(user_timestamp_key)
-    utc_now: datetime = _utc_now()
-    user_cache: set[str] = set()
-    if not user_cache_timestamp or utc_now - user_cache_timestamp > _MAX_USER_CACHE_AGE:
-        _LOGGER.debug("Attempting to refresh the cache for '%s'...", username)
-        remote_tas_set: set[str] | None = _get_tas_from_remote_ispyb(username=username)
-        if remote_tas_set is not None:
-            # Got something (may be empty).
-            # An empty list is considered successful - it means the user is known
-            # but does not have access to any proposals/visits.
-            user_cache = remote_tas_set
+    with _SEMAPHORE:
+        # If the user's cache record is too old
+        # (or there is no cache timestamp) then refresh the cache from the ISPyB DB.
+        user_timestamp_key: str = f"{_TIMESTAMP_KEY_PREFIX}{encoded_username}"
+        user_cache_timestamp: datetime = _cache_get_datetime(user_timestamp_key)
+        utc_now: datetime = _utc_now()
+        user_cache: set[str] = set()
+        if (
+            not user_cache_timestamp
+            or utc_now - user_cache_timestamp > _MAX_USER_CACHE_AGE
+        ):
+            _LOGGER.debug("Attempting to refresh the cache for '%s'...", username)
+            remote_tas_set: set[str] | None = _get_tas_from_remote_ispyb(
+                username=username
+            )
+            if remote_tas_set is not None:
+                # Got something (may be empty).
+                # An empty list is considered successful - it means the user is known
+                # but does not have access to any proposals/visits.
+                user_cache = remote_tas_set
+            else:
+                _LOGGER.warning("Failed to get TAS set for '%s'", username)
+            # Reset the user's cache timestamp regardless of success.
+            # We'll try this user again at the next expiry.
+            _LOGGER.info("New cache for '%s' (size=%d)", username, len(user_cache))
+            client: RetryingClient = _get_memcached_retrying_client()
+            client.set(encoded_username, user_cache)
+            client.set(user_timestamp_key, utc_now)
+            client.close()
         else:
-            _LOGGER.warning("Failed to get TAS set for '%s'", username)
-        # Reset the user's cache timestamp regardless of success.
-        # We'll try this user again at the next expiry.
-        _LOGGER.info("New cache for '%s' (size=%d)", username, len(user_cache))
-        client: RetryingClient = _get_memcached_retrying_client()
-        client.set(encoded_username, user_cache)
-        client.set(user_timestamp_key, utc_now)
-        client.close()
-    else:
-        # Cache has not expired and should be set to something...
-        user_cache = _cache_get_set(encoded_username)
+            # Cache has not expired and should be set to something...
+            user_cache = _cache_get_set(encoded_username)
 
     count: int = len(user_cache)
     record: str = "record" if count == 1 else "records"
