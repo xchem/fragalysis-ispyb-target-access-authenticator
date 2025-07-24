@@ -59,6 +59,7 @@ repos:
     args:
     - --install-types
     - --ignore-missing-imports
+    - --check-untyped-defs
 
 # Pylint
 - repo: https://github.com/pycqa/pylint

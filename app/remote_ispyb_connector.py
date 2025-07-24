@@ -11,6 +11,8 @@ from ispyb.exception import (
     ISPyBNoResultException,
     ISPyBRetrieveFailed,
 )
+from pymysql import Connection
+from pymysql.cursors import Cursor
 from pymysql.err import OperationalError
 
 from .config import Config
@@ -33,10 +35,10 @@ PYMYSQL_EXCEPTION_RECONNECT_DELAY_S = 1
 class SSHConnector(Connector):
     def __init__(self):
         self.conn_inactivity = Config.ISPYB_CONN_INACTIVITY
-        self.lock = threading.Lock()
-        self.conn = None
-        self.server = None
-        self.last_activity_ts = None
+        self.lock: threading.Lock = threading.Lock()
+        self.conn: Connection[Cursor] | None = None
+        self.server: sshtunnel.SSHTunnelForwarder | None = None
+        self.last_activity_ts: float | None = None
 
         creds = {
             "ssh_host": Config.SSH_HOST,
@@ -51,6 +53,7 @@ class SSHConnector(Connector):
         }
         logger.debug("Creating remote connector: %s", creds)
         self.remote_connect(**creds)
+        assert self.server
         logger.debug(
             "Started remote ssh_host=%s ssh_user=%s local_bind_port=%s",
             Config.SSH_HOST,
@@ -102,6 +105,7 @@ class SSHConnector(Connector):
         logger.debug("Created SSHTunnelForwarder")
 
         # stops hanging connections in transport
+        assert self.server
         self.server.daemon_forward_servers = True
         self.server.daemon_transport = True
 
@@ -158,7 +162,6 @@ class SSHConnector(Connector):
             if connect_attempts > 0:
                 logger.debug("Connected")
             PrometheusMetrics.new_ispyb_connection()
-            self.conn.autocommit = True
         else:
             if connect_attempts > 0:
                 logger.warning("Failed to connect")
@@ -168,7 +171,10 @@ class SSHConnector(Connector):
         self.last_activity_ts = time.time()
 
     def create_cursor(self):
-        if time.time() - self.last_activity_ts > self.conn_inactivity:
+        if (
+            not self.last_activity_ts
+            or time.time() - self.last_activity_ts > self.conn_inactivity
+        ):
             # re-connect:
             self.connect(self.user, self.pw, self.host, self.db, self.port)
         self.last_activity_ts = time.time()
@@ -181,6 +187,7 @@ class SSHConnector(Connector):
         return cursor
 
     def call_sp_retrieve(self, procname, args):
+        assert self.conn
         with self.lock:
             cursor = self.create_cursor()
             try:

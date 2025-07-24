@@ -62,10 +62,8 @@ _PING_CACHE_KEY: str = "ispyb-ping"
 _PING_CACHE_TIMESTAMP_KEY: str = f"{_TIMESTAMP_KEY_PREFIX}{_PING_CACHE_KEY}"
 _MAX_PING_CACHE_AGE: timedelta = timedelta(seconds=Config.PING_CACHE_EXPIRY_SECONDS)
 
-# Configure memcached.
 
-
-# We use custom serialisers to convert our list of strings
+# We use custom serializers to convert our list of strings
 # to/from a string (which is the memcached native value type).
 # Memcached value size if limited to 1MB - about 90_000 TAS strings?
 class TaSerde:
@@ -115,6 +113,9 @@ else:
 with open("VERSION", "r", encoding="utf-8") as version_file:
     _VERSION: str = version_file.read().strip()
 
+# An instance of the Serializer/deserializer
+_TA_SERDE: TaSerde = TaSerde()
+
 
 class TargetAccessGetVersionResponse(BaseModel):
     """/version/ GET response."""
@@ -139,8 +140,8 @@ class TargetAccessGetUserTasResponse(BaseModel):
 
     # Number of Target Access Strings in the response
     count: int
-    # Possibly empty list of Target Access strings
-    target_access: list[str]
+    # Possibly empty set of Target Access strings
+    target_access: set[str]
 
 
 def _get_memcached_retrying_client() -> RetryingClient:
@@ -151,7 +152,7 @@ def _get_memcached_retrying_client() -> RetryingClient:
         connect_timeout=4,
         timeout=0.5,
         ignore_exc=True,
-        serde=TaSerde(),
+        serde=_TA_SERDE,
     )
     return RetryingClient(
         base_client,
@@ -262,14 +263,12 @@ def _get_tas_from_remote_ispyb(username: str) -> set[str] | None:
     return prop_id_set
 
 
-def _cache_get_datetime(key: str) -> datetime:
+def _try_memcached_client_get(client: RetryingClient, key: str) -> Any:
     """Common memcached get() logic."""
-    response: datetime = _utc_now()
+    response: Any = None
     err: str | None = None
     err_msg: str | None = None
 
-    client: RetryingClient = _get_memcached_retrying_client()
-    assert client
     try:
         response = client.get(key)
     except AssertionError as a_err:
@@ -285,69 +284,8 @@ def _cache_get_datetime(key: str) -> datetime:
         err = o_err.__class__.__name__
         err_msg = str(o_err)
 
-    client.close()
     if err:
-        _LOGGER.warning("Cache %s with %s datetime (%s)", err, key, err_msg)
-
-    return response
-
-
-def _cache_get_str(key: str) -> str:
-    """Common memcached get() logic."""
-    response: str = ""
-    err: str | None = None
-    err_msg: str | None = None
-
-    client: RetryingClient = _get_memcached_retrying_client()
-    assert client
-    try:
-        response = client.get(key)
-    except AssertionError as a_err:
-        err = a_err.__class__.__name__
-        err_msg = str(a_err)
-    except KeyError as k_err:
-        err = k_err.__class__.__name__
-        err_msg = str(k_err)
-    except TimeoutError as t_err:
-        err = t_err.__class__.__name__
-        err_msg = str(t_err)
-    except OSError as o_err:
-        err = o_err.__class__.__name__
-        err_msg = str(o_err)
-
-    client.close()
-    if err:
-        _LOGGER.warning("Cache %s with %s str (%s)", err, key, err_msg)
-
-    return response
-
-
-def _cache_get_set(key: str) -> set[str]:
-    """Common memcached get() logic."""
-    response: set[str] = set()
-    err: str | None = None
-    err_msg: str | None = None
-
-    client: RetryingClient = _get_memcached_retrying_client()
-    assert client
-    try:
-        response = client.get(key)
-    except AssertionError as a_err:
-        err = a_err.__class__.__name__
-        err_msg = str(a_err)
-    except KeyError as k_err:
-        err = k_err.__class__.__name__
-        err_msg = str(k_err)
-    except TimeoutError as t_err:
-        err = t_err.__class__.__name__
-        err_msg = str(t_err)
-    except OSError as o_err:
-        err = o_err.__class__.__name__
-        err_msg = str(o_err)
-
-    client.close()
-    if err:
-        _LOGGER.warning("Cache %s with %s set (%s)", err, key, err_msg)
+        _LOGGER.warning("Cache GET %s with %s (%s)", err, key, err_msg)
 
     return response
 
@@ -379,34 +317,43 @@ def get_taa_version() -> TargetAccessGetVersionResponse:
 def ping():
     """Returns 'OK' if we can communicate with the underlying ISPyB service
     (i.e. create a connector). Anything other than 'OK' indicates a problem.
+    We Throttle /ping requests by only querying the underlying service
+    if there's no cached ping result or it's too old.
     """
     with _SEMAPHORE:
-        # Throttle /ping requests by only querying the underlying service
-        # if there's no cached ping result or it's too old...
-        utc_now: datetime = _utc_now()
-        ping_cache_timestamp: datetime | None = _cache_get_datetime(
-            _PING_CACHE_TIMESTAMP_KEY
+        client: RetryingClient = _get_memcached_retrying_client()
+        assert client
+        # Current ping state (in the cache)
+        # we do this so we can log changes.
+        pre_ping_status: str | None = _try_memcached_client_get(client, _PING_CACHE_KEY)
+
+        ping_cache_timestamp: datetime | None = _try_memcached_client_get(
+            client, _PING_CACHE_TIMESTAMP_KEY
         )
-        ping_status_str: str = "NOT OK"
+
+        status_str: str = "NOT OK"
+        utc_now: datetime = _utc_now()
         if (
             not ping_cache_timestamp
             or utc_now - ping_cache_timestamp > _MAX_PING_CACHE_AGE
         ):
             _LOGGER.debug("ping cache value is too old - refreshing...")
             if ssh_connector := _get_connector():
+                assert ssh_connector.server
                 ssh_connector.server.stop()
-                ping_status_str = "OK"
-            _LOGGER.info("New ISPyB PING [%s]", ping_status_str)
-            client: RetryingClient = _get_memcached_retrying_client()
-            assert client
-            client.set(_PING_CACHE_KEY, ping_status_str)
+                status_str = "OK"
+            client.set(_PING_CACHE_KEY, status_str)
             client.set(_PING_CACHE_TIMESTAMP_KEY, utc_now)
-            client.close()
         else:
             # Ping has not expired and should be set to something...
-            ping_status_str = _cache_get_str(_PING_CACHE_KEY)
+            status_str = _try_memcached_client_get(client, _PING_CACHE_KEY)
 
-    return TargetAccessGetPingResponse(ping=ping_status_str)
+        client.close()
+
+        if status_str != pre_ping_status:
+            _LOGGER.info("New ISPyB PING status [%s]", status_str)
+
+    return TargetAccessGetPingResponse(ping=status_str)
 
 
 @app.get("/target-access/{username}", status_code=status.HTTP_200_OK)
@@ -448,10 +395,14 @@ def get_taa_user_tas(
         )
 
     with _SEMAPHORE:
+        client: RetryingClient = _get_memcached_retrying_client()
+        assert client
         # If the user's cache record is too old
         # (or there is no cache timestamp) then refresh the cache from the ISPyB DB.
         user_timestamp_key: str = f"{_TIMESTAMP_KEY_PREFIX}{encoded_username}"
-        user_cache_timestamp: datetime = _cache_get_datetime(user_timestamp_key)
+        user_cache_timestamp: datetime = _try_memcached_client_get(
+            client, user_timestamp_key
+        )
         utc_now: datetime = _utc_now()
         user_cache: set[str] = set()
         if (
@@ -471,18 +422,20 @@ def get_taa_user_tas(
                 _LOGGER.warning("Failed to get TAS set for '%s'", username)
             # Reset the user's cache timestamp regardless of success.
             # We'll try this user again at the next expiry.
-            _LOGGER.info("New cache for '%s' (size=%d)", username, len(user_cache))
-            client: RetryingClient = _get_memcached_retrying_client()
+            _LOGGER.info(
+                "Cache replacement for '%s' (size=%d)", username, len(user_cache)
+            )
             client.set(encoded_username, user_cache)
             client.set(user_timestamp_key, utc_now)
-            client.close()
         else:
             # Cache has not expired and should be set to something...
-            user_cache = _cache_get_set(encoded_username)
+            user_cache = _try_memcached_client_get(client, encoded_username) or set()
 
-    count: int = len(user_cache)
-    record: str = "record" if count == 1 else "records"
-    _LOGGER.debug("Returning %s %s for '%s'", count, record, username)
+        client.close()
+
+        count: int = len(user_cache)
+        record: str = "record" if count == 1 else "records"
+        _LOGGER.debug("Returning %s %s for '%s'", count, record, username)
 
     return TargetAccessGetUserTasResponse(
         count=count,
