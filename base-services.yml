@@ -33,7 +33,7 @@ services:
       TAA_QUERY_KEY: blob1234
       TAA_MEMCACHED_LOCATION: memcached
       TAA_CACHE_EXPIRY_MINUTES: 2
-      TAA_PING_CACHE_EXPIRY_SECONDS: 25
+      TAA_PING_CACHE_EXPIRY_SECONDS: 50
     ports:
     - '8080:8080'
     depends_on:

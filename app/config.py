@@ -7,7 +7,7 @@ class Config:
 
     CACHE_EXPIRY_MINUTES: int = int(os.environ.get("TAA_CACHE_EXPIRY_MINUTES", "2"))
     PING_CACHE_EXPIRY_SECONDS: int = int(
-        os.environ.get("TAA_PING_CACHE_EXPIRY_SECONDS", "25")
+        os.environ.get("TAA_PING_CACHE_EXPIRY_SECONDS", "50")
     )
 
     ISPYB_HOST: str | None = os.environ.get("TAA_ISPYB_HOST")
