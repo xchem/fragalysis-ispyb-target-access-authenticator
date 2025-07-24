@@ -50,5 +50,10 @@ WORKDIR /logs
 ENV HOME=${APP_ROOT}
 WORKDIR ${APP_ROOT}
 
+# Workers (processes)
+ENV WORKERS=1
+# Concurrency (per worker)
+ENV CONCURRENCY=1
+
 # Start the application
 CMD ["./docker-entrypoint.sh"]
