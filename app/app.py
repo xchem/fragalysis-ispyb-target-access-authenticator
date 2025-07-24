@@ -78,7 +78,7 @@ class TaSerde:
     def deserialize(self, key, value, flags):
         del key
         if flags == 1:
-            return value
+            return value.decode("utf-8")
         if flags == 2:
             return parse(value)
         if flags == 3:
