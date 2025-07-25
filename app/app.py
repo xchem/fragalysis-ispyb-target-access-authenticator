@@ -380,7 +380,8 @@ def ping():
         status_str: str = "NOT OK"
         utc_now: datetime = _utc_now()
         if (
-            not ping_cache_timestamp
+            pre_ping_status is None
+            or not ping_cache_timestamp
             or utc_now - ping_cache_timestamp > _MAX_PING_CACHE_AGE
         ):
             _LOGGER.debug("ping cache value is too old - refreshing...")
@@ -393,7 +394,7 @@ def ping():
             client.set(_PING_CACHE_TIMESTAMP_KEY, utc_now)
         else:
             # Ping has not expired and should be set to something...
-            status_str = _try_memcached_client_get(client, _PING_CACHE_KEY)
+            status_str = pre_ping_status
 
         client.close()
 
@@ -418,16 +419,6 @@ def get_taa_user_tas(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid/missing X_TAAQueryKey",
         )
-    if username in _INVALID_USERNAMES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Username cannot be '{username}'",
-        )
-    if username.startswith(_TIMESTAMP_KEY_PREFIX):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Username cannot begin with '{_TIMESTAMP_KEY_PREFIX}'",
-        )
 
     _LOGGER.debug("Request for '%s'", username)
 
@@ -441,13 +432,28 @@ def get_taa_user_tas(
             detail="Encoded username exceeds 250 characters",
         )
 
+    if encoded_username in _INVALID_USERNAMES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Username cannot be '{username}'",
+        )
+    if encoded_username.startswith(_TIMESTAMP_KEY_PREFIX):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Username cannot begin with '{_TIMESTAMP_KEY_PREFIX}'",
+        )
+
     with _SEMAPHORE:
         client: RetryingClient = _get_memcached_retrying_client()
         assert client
         client.incr(_QUERY_COUNTER_KEY, 1)
 
-        # If the user's cache record is too old
-        # (or there is no cache timestamp) then refresh the cache from the ISPyB DB.
+        # If the user's cache record is not present (may have been ejected by memcached),
+        # too old, or there is no cache timestamp then refresh the cache
+        # using the underlying ISPyB DB.
+        existing_cache: set[str] | None = _try_memcached_client_get(
+            client, encoded_username
+        )
         user_timestamp_key: str = f"{_TIMESTAMP_KEY_PREFIX}{encoded_username}"
         user_cache_timestamp: datetime = _try_memcached_client_get(
             client, user_timestamp_key
@@ -455,7 +461,8 @@ def get_taa_user_tas(
         utc_now: datetime = _utc_now()
         user_cache: set[str] = set()
         if (
-            not user_cache_timestamp
+            existing_cache is None
+            or not user_cache_timestamp
             or utc_now - user_cache_timestamp > _MAX_USER_CACHE_AGE
         ):
             _LOGGER.debug("Attempting to refresh the cache for '%s'...", username)
@@ -479,7 +486,7 @@ def get_taa_user_tas(
             client.set(user_timestamp_key, utc_now)
         else:
             # Cache has not expired and should be set to something...
-            user_cache = _try_memcached_client_get(client, encoded_username) or set()
+            user_cache = existing_cache
 
         client.close()
 
