@@ -331,25 +331,6 @@ _INVALID_USERNAMES: set[str] = {
 }
 
 
-# A stats function for debugging calls made to the API (ping and target-access)
-# and calls to the underlying DB. From a shell: -
-#
-#   python
-#   from app.app import stats
-#   stats()
-def stats() -> None:
-    """Command-line/debug function to display collected stats."""
-    stats_client: RetryingClient = _get_memcached_retrying_client()
-    ping_count: int = counter_client.get(_PING_COUNTER_KEY)
-    ispyb_ping_count: int = counter_client.get(_ISPYB_PING_COUNTER_KEY)
-    query_count: int = counter_client.get(_QUERY_COUNTER_KEY)
-    ispyb_query_count: int = counter_client.get(_ISPYB_QUERY_COUNTER_KEY)
-    stats_client.close()
-    print(
-        f"ping_count={ispyb_ping_count}/{ping_count} query_count={ispyb_query_count}/{query_count}"
-    )
-
-
 # Endpoints (in-cluster) for the ISPyP Authenticator -----------------------------------
 
 

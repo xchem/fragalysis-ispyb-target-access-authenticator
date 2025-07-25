@@ -35,6 +35,7 @@ COPY --from=poetry-base /.venv /.venv
 ENV PYTHONPATH="/.venv/lib/python3.12/site-packages/"
 ENV PATH=/.venv/bin:$PATH
 
+COPY stats.py .
 COPY app/ ./app/
 COPY logging.config .
 COPY docker-entrypoint.sh .
