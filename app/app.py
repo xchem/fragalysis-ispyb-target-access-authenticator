@@ -9,7 +9,6 @@ from typing import Annotated, Any
 from urllib.parse import quote
 
 import sshtunnel
-from dateutil.parser import parse
 from fastapi import (
     FastAPI,
     Header,
@@ -18,10 +17,15 @@ from fastapi import (
 )
 from ispyb.exception import ISPyBConnectionException, ISPyBNoResultException
 from pydantic import BaseModel
-from pymemcache.client.base import Client
 from pymemcache.client.retrying import RetryingClient
-from pymemcache.exceptions import MemcacheUnexpectedCloseError
 
+from .common import (
+    ISPYB_PING_COUNTER_KEY,
+    ISPYB_QUERY_COUNTER_KEY,
+    PING_COUNTER_KEY,
+    QUERY_COUNTER_KEY,
+    get_memcached_retrying_client,
+)
 from .config import Config
 from .remote_ispyb_connector import SSHConnector
 
@@ -63,36 +67,6 @@ _PING_CACHE_TIMESTAMP_KEY: str = f"{_TIMESTAMP_KEY_PREFIX}{_PING_CACHE_KEY}"
 _MAX_PING_CACHE_AGE: timedelta = timedelta(seconds=Config.PING_CACHE_EXPIRY_SECONDS)
 
 
-# We use custom serializers to convert our objects
-# to/from a string (which is the memcached native value type).
-# Memcached value size if limited to 1MB - about 90_000 TAS strings?
-class TaSerde:
-    def serialize(self, key, value):
-        del key
-        if isinstance(value, str):
-            return (value, 1)
-        if isinstance(value, int):
-            return (str(value), 2)
-        if isinstance(value, datetime):
-            return (str(value), 3)
-        return (repr(value), 4)
-
-    def deserialize(self, key, value, flags):
-        del key
-        if flags == 1:
-            # Strings are stored as bytes,
-            # so we convert back to string
-            return value.decode("utf-8")
-        if flags == 2:
-            return int(value)
-        if flags == 3:
-            return parse(value)
-        if flags == 4:
-            return eval(value)  # pylint: disable=eval-used
-        # How did we get here?
-        assert False
-
-
 def _utc_now() -> datetime:
     """Get the current time (UTC)."""
     return datetime.now(timezone.utc)
@@ -118,9 +92,6 @@ else:
 # Get our version (from the 'VERSION' file)
 with open("VERSION", "r", encoding="utf-8") as version_file:
     _VERSION: str = version_file.read().strip()
-
-# An instance of the Serializer/deserializer
-_TA_SERDE: TaSerde = TaSerde()
 
 
 class TargetAccessGetVersionResponse(BaseModel):
@@ -148,24 +119,6 @@ class TargetAccessGetUserTasResponse(BaseModel):
     count: int
     # Possibly empty set of Target Access strings
     target_access: set[str]
-
-
-def _get_memcached_retrying_client() -> RetryingClient:
-    # The location is either a host ("localhost") or host and port ("localhost:1234").
-    # If the port is not the expected default of 11211 is assumed.
-    base_client: Client = Client(
-        Config.MEMCACHED_LOCATION,
-        connect_timeout=4,
-        timeout=0.5,
-        ignore_exc=True,
-        serde=_TA_SERDE,
-    )
-    return RetryingClient(
-        base_client,
-        attempts=5,
-        retry_delay=0.5,
-        retry_for=[MemcacheUnexpectedCloseError],
-    )
 
 
 def _get_connector() -> SSHConnector | None:
@@ -270,7 +223,7 @@ def _get_tas_from_remote_ispyb(username: str) -> set[str] | None:
 
 
 def _try_memcached_client_get(client: RetryingClient, key: str) -> Any:
-    """Common memcached get() logic."""
+    """Common memcached get() logic, handling expected exceptions."""
     response: Any = None
     err: str | None = None
     err_msg: str | None = None
@@ -299,35 +252,30 @@ def _try_memcached_client_get(client: RetryingClient, key: str) -> Any:
 # Inject some mock data for "dave lister"?
 if Config.ENABLE_DAVE_LISTER:
     _DUMMY_USER: str = quote("dave lister")
-    dummy_user_client: RetryingClient = _get_memcached_retrying_client()
+    dummy_user_client: RetryingClient = get_memcached_retrying_client()
     assert dummy_user_client
     dummy_user_client.set(_DUMMY_USER, set(["sb99999-9"]))
     dummy_user_client.set(f"{_TIMESTAMP_KEY_PREFIX}{_DUMMY_USER}", _utc_now())
     dummy_user_client.close()
 
-# Counters (stats)
-_PING_COUNTER_KEY: str = "ping-counter"
-_ISPYB_PING_COUNTER_KEY: str = "ispyb-ping-counter"
-_QUERY_COUNTER_KEY: str = "query-counter"
-_ISPYB_QUERY_COUNTER_KEY: str = "ispyb-query-counter"
 
 # Clear counter/stats values
 # We count the number of ping calls and query calls
-counter_client: RetryingClient = _get_memcached_retrying_client()
+counter_client: RetryingClient = get_memcached_retrying_client()
 assert counter_client
-counter_client.set(_PING_COUNTER_KEY, 0)
-counter_client.set(_ISPYB_PING_COUNTER_KEY, 0)
-counter_client.set(_QUERY_COUNTER_KEY, 0)
-counter_client.set(_ISPYB_QUERY_COUNTER_KEY, 0)
+counter_client.set(PING_COUNTER_KEY, 0)
+counter_client.set(ISPYB_PING_COUNTER_KEY, 0)
+counter_client.set(QUERY_COUNTER_KEY, 0)
+counter_client.set(ISPYB_QUERY_COUNTER_KEY, 0)
 counter_client.close()
 
 # List of invalid (reserved) usernames
 _INVALID_USERNAMES: set[str] = {
-    _ISPYB_PING_COUNTER_KEY,
-    _ISPYB_QUERY_COUNTER_KEY,
+    ISPYB_PING_COUNTER_KEY,
+    ISPYB_QUERY_COUNTER_KEY,
     _PING_CACHE_KEY,
-    _PING_COUNTER_KEY,
-    _QUERY_COUNTER_KEY,
+    PING_COUNTER_KEY,
+    QUERY_COUNTER_KEY,
 }
 
 
@@ -352,9 +300,9 @@ def ping():
     if there's no cached ping result or it's too old.
     """
     with _SEMAPHORE:
-        client: RetryingClient = _get_memcached_retrying_client()
+        client: RetryingClient = get_memcached_retrying_client()
         assert client
-        client.incr(_PING_COUNTER_KEY, 1)
+        client.incr(PING_COUNTER_KEY, 1)
 
         # Current ping state (in the cache)
         # we do this so we can log changes.
@@ -376,7 +324,7 @@ def ping():
                 assert ssh_connector.server
                 ssh_connector.server.stop()
                 status_str = "OK"
-            client.incr(_ISPYB_PING_COUNTER_KEY, 1)
+            client.incr(ISPYB_PING_COUNTER_KEY, 1)
             client.set(_PING_CACHE_KEY, status_str)
             client.set(_PING_CACHE_TIMESTAMP_KEY, utc_now)
         else:
@@ -431,9 +379,9 @@ def get_taa_user_tas(
         )
 
     with _SEMAPHORE:
-        client: RetryingClient = _get_memcached_retrying_client()
+        client: RetryingClient = get_memcached_retrying_client()
         assert client
-        client.incr(_QUERY_COUNTER_KEY, 1)
+        client.incr(QUERY_COUNTER_KEY, 1)
 
         # If the user's cache record is not present (may have been ejected by memcached),
         # too old, or there is no cache timestamp then refresh the cache
@@ -468,7 +416,7 @@ def get_taa_user_tas(
             _LOGGER.info(
                 "Cache replacement for '%s' (size=%d)", username, len(user_cache)
             )
-            client.incr(_ISPYB_QUERY_COUNTER_KEY, 1)
+            client.incr(ISPYB_QUERY_COUNTER_KEY, 1)
             client.set(encoded_username, user_cache)
             client.set(user_timestamp_key, utc_now)
         else:
