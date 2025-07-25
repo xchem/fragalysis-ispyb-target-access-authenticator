@@ -367,7 +367,7 @@ def ping():
     with _SEMAPHORE:
         client: RetryingClient = _get_memcached_retrying_client()
         assert client
-        client.incr(_PING_COUNTER_KEY)
+        client.incr(_PING_COUNTER_KEY, 1)
 
         # Current ping state (in the cache)
         # we do this so we can log changes.
@@ -388,7 +388,7 @@ def ping():
                 assert ssh_connector.server
                 ssh_connector.server.stop()
                 status_str = "OK"
-            client.incr(_ISPYB_PING_COUNTER_KEY)
+            client.incr(_ISPYB_PING_COUNTER_KEY, 1)
             client.set(_PING_CACHE_KEY, status_str)
             client.set(_PING_CACHE_TIMESTAMP_KEY, utc_now)
         else:
@@ -444,7 +444,7 @@ def get_taa_user_tas(
     with _SEMAPHORE:
         client: RetryingClient = _get_memcached_retrying_client()
         assert client
-        client.incr(_QUERY_COUNTER_KEY)
+        client.incr(_QUERY_COUNTER_KEY, 1)
 
         # If the user's cache record is too old
         # (or there is no cache timestamp) then refresh the cache from the ISPyB DB.
@@ -474,7 +474,7 @@ def get_taa_user_tas(
             _LOGGER.info(
                 "Cache replacement for '%s' (size=%d)", username, len(user_cache)
             )
-            client.incr(_ISPYB_QUERY_COUNTER_KEY)
+            client.incr(_ISPYB_QUERY_COUNTER_KEY, 1)
             client.set(encoded_username, user_cache)
             client.set(user_timestamp_key, utc_now)
         else:
