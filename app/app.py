@@ -331,6 +331,12 @@ _INVALID_USERNAMES: set[str] = {
 }
 
 
+# A stats function for debugging calls made to the API (ping and target-access)
+# and calls to the underlying DB. From a shell: -
+#
+#   python
+#   from app.app import stats
+#   stats()
 def stats() -> None:
     """Command-line/debug function to display collected stats."""
     stats_client: RetryingClient = _get_memcached_retrying_client()
