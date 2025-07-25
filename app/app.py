@@ -63,7 +63,7 @@ _PING_CACHE_TIMESTAMP_KEY: str = f"{_TIMESTAMP_KEY_PREFIX}{_PING_CACHE_KEY}"
 _MAX_PING_CACHE_AGE: timedelta = timedelta(seconds=Config.PING_CACHE_EXPIRY_SECONDS)
 
 
-# We use custom serializers to convert our list of strings
+# We use custom serializers to convert our objects
 # to/from a string (which is the memcached native value type).
 # Memcached value size if limited to 1MB - about 90_000 TAS strings?
 class TaSerde:
@@ -71,17 +71,23 @@ class TaSerde:
         del key
         if isinstance(value, str):
             return (value, 1)
-        if isinstance(value, datetime):
+        if isinstance(value, int):
             return (str(value), 2)
-        return (repr(value), 3)
+        if isinstance(value, datetime):
+            return (str(value), 3)
+        return (repr(value), 4)
 
     def deserialize(self, key, value, flags):
         del key
         if flags == 1:
+            # Strings are stored as bytes,
+            # so we convert back to string
             return value.decode("utf-8")
         if flags == 2:
-            return parse(value)
+            return int(value)
         if flags == 3:
+            return parse(value)
+        if flags == 4:
             return eval(value)  # pylint: disable=eval-used
         # How did we get here?
         assert False
@@ -299,6 +305,44 @@ if Config.ENABLE_DAVE_LISTER:
     dummy_user_client.set(f"{_TIMESTAMP_KEY_PREFIX}{_DUMMY_USER}", _utc_now())
     dummy_user_client.close()
 
+# Counters (stats)
+_PING_COUNTER_KEY: str = "ping-counter"
+_ISPYB_PING_COUNTER_KEY: str = "ispyb-ping-counter"
+_QUERY_COUNTER_KEY: str = "query-counter"
+_ISPYB_QUERY_COUNTER_KEY: str = "ispyb-query-counter"
+
+# Clear counter/stats values
+# We count the number of ping calls and query calls
+counter_client: RetryingClient = _get_memcached_retrying_client()
+assert counter_client
+counter_client.set(_PING_COUNTER_KEY, 0)
+counter_client.set(_ISPYB_PING_COUNTER_KEY, 0)
+counter_client.set(_QUERY_COUNTER_KEY, 0)
+counter_client.set(_ISPYB_QUERY_COUNTER_KEY, 0)
+counter_client.close()
+
+# List of invalid (reserved) usernames
+_INVALID_USERNAMES: set[str] = {
+    _ISPYB_PING_COUNTER_KEY,
+    _ISPYB_QUERY_COUNTER_KEY,
+    _PING_CACHE_KEY,
+    _PING_COUNTER_KEY,
+    _QUERY_COUNTER_KEY,
+}
+
+
+def stats() -> None:
+    """Command-line/debug function to display collected stats."""
+    stats_client: RetryingClient = _get_memcached_retrying_client()
+    ping_count: int = counter_client.get(_PING_COUNTER_KEY)
+    ispyb_ping_count: int = counter_client.get(_ISPYB_PING_COUNTER_KEY)
+    query_count: int = counter_client.get(_QUERY_COUNTER_KEY)
+    ispyb_query_count: int = counter_client.get(_ISPYB_QUERY_COUNTER_KEY)
+    stats_client.close()
+    print(
+        f"ping_count={ispyb_ping_count}/{ping_count} query_count={ispyb_query_count}/{query_count}"
+    )
+
 
 # Endpoints (in-cluster) for the ISPyP Authenticator -----------------------------------
 
@@ -323,6 +367,8 @@ def ping():
     with _SEMAPHORE:
         client: RetryingClient = _get_memcached_retrying_client()
         assert client
+        client.incr(_PING_COUNTER_KEY)
+
         # Current ping state (in the cache)
         # we do this so we can log changes.
         pre_ping_status: str | None = _try_memcached_client_get(client, _PING_CACHE_KEY)
@@ -342,6 +388,7 @@ def ping():
                 assert ssh_connector.server
                 ssh_connector.server.stop()
                 status_str = "OK"
+            client.incr(_ISPYB_PING_COUNTER_KEY)
             client.set(_PING_CACHE_KEY, status_str)
             client.set(_PING_CACHE_TIMESTAMP_KEY, utc_now)
         else:
@@ -371,10 +418,10 @@ def get_taa_user_tas(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid/missing X_TAAQueryKey",
         )
-    if username == _PING_CACHE_KEY:
+    if username in _INVALID_USERNAMES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Username cannot be '{_PING_CACHE_KEY}'",
+            detail=f"Username cannot be '{username}'",
         )
     if username.startswith(_TIMESTAMP_KEY_PREFIX):
         raise HTTPException(
@@ -397,6 +444,8 @@ def get_taa_user_tas(
     with _SEMAPHORE:
         client: RetryingClient = _get_memcached_retrying_client()
         assert client
+        client.incr(_QUERY_COUNTER_KEY)
+
         # If the user's cache record is too old
         # (or there is no cache timestamp) then refresh the cache from the ISPyB DB.
         user_timestamp_key: str = f"{_TIMESTAMP_KEY_PREFIX}{encoded_username}"
@@ -425,6 +474,7 @@ def get_taa_user_tas(
             _LOGGER.info(
                 "Cache replacement for '%s' (size=%d)", username, len(user_cache)
             )
+            client.incr(_ISPYB_QUERY_COUNTER_KEY)
             client.set(encoded_username, user_cache)
             client.set(user_timestamp_key, utc_now)
         else:
