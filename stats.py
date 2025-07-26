@@ -73,7 +73,8 @@ for key in sorted(keys):
         num_tas += tas
         max_tas = max(max_tas, tas)
 
-print("---")
+if num_usernames:
+    print("---")
 
 avg_tas: float = 0 if num_usernames == 0 else num_tas / num_usernames
 print(f"total usernames={num_usernames}")
