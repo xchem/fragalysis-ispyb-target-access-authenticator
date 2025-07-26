@@ -35,6 +35,10 @@ COPY --from=poetry-base /.venv /.venv
 ENV PYTHONPATH="/.venv/lib/python3.12/site-packages/"
 ENV PATH=/.venv/bin:$PATH
 
+# Install tools for memcached.
+# This allows us to run 'memdump -s localhost' to display all the keys.
+RUN apk add libmemcached
+
 COPY stats.py .
 COPY app/ ./app/
 COPY logging.config .

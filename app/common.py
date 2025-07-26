@@ -8,10 +8,24 @@ from pymemcache.exceptions import MemcacheUnexpectedCloseError
 from .config import Config
 
 # Counters (stats)
+PING_CACHE_KEY: str = "ispyb-ping"
 PING_COUNTER_KEY: str = "ping-counter"
 ISPYB_PING_COUNTER_KEY: str = "ispyb-ping-counter"
 QUERY_COUNTER_KEY: str = "query-counter"
 ISPYB_QUERY_COUNTER_KEY: str = "ispyb-query-counter"
+
+TIMESTAMP_KEY_PREFIX: str = "timestamp-"
+
+PING_CACHE_TIMESTAMP_KEY: str = f"{TIMESTAMP_KEY_PREFIX}{PING_CACHE_KEY}"
+
+# List of invalid (reserved) usernames
+INVALID_USERNAMES: set[str] = {
+    ISPYB_PING_COUNTER_KEY,
+    ISPYB_QUERY_COUNTER_KEY,
+    PING_CACHE_KEY,
+    PING_COUNTER_KEY,
+    QUERY_COUNTER_KEY,
+}
 
 
 # We use custom serializers to convert our objects
@@ -45,6 +59,16 @@ class TaSerde:
 
 
 _TA_SERDE: TaSerde = TaSerde()
+
+
+def get_encoded_username_timestamp_key(encoded_username: str) -> str:
+    return f"{TIMESTAMP_KEY_PREFIX}{encoded_username}"
+
+
+def valid_encoded_username(encoded_username: str) -> bool:
+    if encoded_username in INVALID_USERNAMES:
+        return False
+    return not encoded_username.startswith(TIMESTAMP_KEY_PREFIX)
 
 
 def get_memcached_retrying_client() -> RetryingClient:

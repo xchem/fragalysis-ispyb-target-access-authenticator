@@ -22,9 +22,13 @@ from pymemcache.client.retrying import RetryingClient
 from .common import (
     ISPYB_PING_COUNTER_KEY,
     ISPYB_QUERY_COUNTER_KEY,
+    PING_CACHE_KEY,
+    PING_CACHE_TIMESTAMP_KEY,
     PING_COUNTER_KEY,
     QUERY_COUNTER_KEY,
+    get_encoded_username_timestamp_key,
     get_memcached_retrying_client,
+    valid_encoded_username,
 )
 from .config import Config
 from .remote_ispyb_connector import SSHConnector
@@ -55,15 +59,7 @@ _VERSION_NAME: str = "XChem Python FastAPI TAS Authenticator"
 # This UTC is recorded against the key 'timestamp-{url-encoded-username}'.
 # If the timestamp of the cache has expired we try and collect a new set of
 # target access strings. if that fails we return the existing cache.
-
-_TIMESTAMP_KEY_PREFIX: str = "timestamp-"
 _MAX_USER_CACHE_AGE: timedelta = timedelta(minutes=Config.CACHE_EXPIRY_MINUTES)
-
-# The memcached key for the Ping cache (and its timestamp)
-# This cannot be mistaken for a username - and we check this
-# early in the /target-access endpoint. the
-_PING_CACHE_KEY: str = "ispyb-ping"
-_PING_CACHE_TIMESTAMP_KEY: str = f"{_TIMESTAMP_KEY_PREFIX}{_PING_CACHE_KEY}"
 _MAX_PING_CACHE_AGE: timedelta = timedelta(seconds=Config.PING_CACHE_EXPIRY_SECONDS)
 
 
@@ -255,7 +251,7 @@ if Config.ENABLE_DAVE_LISTER:
     dummy_user_client: RetryingClient = get_memcached_retrying_client()
     assert dummy_user_client
     dummy_user_client.set(_DUMMY_USER, set(["sb99999-9"]))
-    dummy_user_client.set(f"{_TIMESTAMP_KEY_PREFIX}{_DUMMY_USER}", _utc_now())
+    dummy_user_client.set(get_encoded_username_timestamp_key(_DUMMY_USER), _utc_now())
     dummy_user_client.close()
 
 
@@ -268,15 +264,6 @@ counter_client.set(ISPYB_PING_COUNTER_KEY, 0)
 counter_client.set(QUERY_COUNTER_KEY, 0)
 counter_client.set(ISPYB_QUERY_COUNTER_KEY, 0)
 counter_client.close()
-
-# List of invalid (reserved) usernames
-_INVALID_USERNAMES: set[str] = {
-    ISPYB_PING_COUNTER_KEY,
-    ISPYB_QUERY_COUNTER_KEY,
-    _PING_CACHE_KEY,
-    PING_COUNTER_KEY,
-    QUERY_COUNTER_KEY,
-}
 
 
 # Endpoints (in-cluster) for the ISPyP Authenticator -----------------------------------
@@ -306,10 +293,10 @@ def ping():
 
         # Current ping state (in the cache)
         # we do this so we can log changes.
-        pre_ping_status: str | None = _try_memcached_client_get(client, _PING_CACHE_KEY)
+        pre_ping_status: str | None = _try_memcached_client_get(client, PING_CACHE_KEY)
 
         ping_cache_timestamp: datetime | None = _try_memcached_client_get(
-            client, _PING_CACHE_TIMESTAMP_KEY
+            client, PING_CACHE_TIMESTAMP_KEY
         )
 
         status_str: str = "NOT OK"
@@ -325,8 +312,8 @@ def ping():
                 ssh_connector.server.stop()
                 status_str = "OK"
             client.incr(ISPYB_PING_COUNTER_KEY, 1)
-            client.set(_PING_CACHE_KEY, status_str)
-            client.set(_PING_CACHE_TIMESTAMP_KEY, utc_now)
+            client.set(PING_CACHE_KEY, status_str)
+            client.set(PING_CACHE_TIMESTAMP_KEY, utc_now)
         else:
             # Ping has not expired and should be set to something...
             status_str = pre_ping_status
@@ -367,15 +354,10 @@ def get_taa_user_tas(
             detail="Encoded username exceeds 250 characters",
         )
 
-    if encoded_username in _INVALID_USERNAMES:
+    if not valid_encoded_username(encoded_username):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Username cannot be '{username}'",
-        )
-    if encoded_username.startswith(_TIMESTAMP_KEY_PREFIX):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Username cannot begin with '{_TIMESTAMP_KEY_PREFIX}'",
         )
 
     with _SEMAPHORE:
@@ -389,7 +371,7 @@ def get_taa_user_tas(
         existing_cache: set[str] | None = _try_memcached_client_get(
             client, encoded_username
         )
-        user_timestamp_key: str = f"{_TIMESTAMP_KEY_PREFIX}{encoded_username}"
+        user_timestamp_key: str = get_encoded_username_timestamp_key(encoded_username)
         user_cache_timestamp: datetime = _try_memcached_client_get(
             client, user_timestamp_key
         )
