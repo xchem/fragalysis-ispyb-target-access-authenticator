@@ -86,8 +86,8 @@ statistics: -
 
     ./stats.py
 
-Tou can also display the cached target-access strings for a given user but providing
-their username to the `tas.py` utility: -
+Tou can also display the cached target-access strings for a given user by providing
+a username to the `tas.py` utility: -
 
     ./tas.py 'dave lister'
 
