@@ -33,12 +33,34 @@ print("---")
 # Display our own stats (ping/query counts)
 
 PING_COUNT: int = _CLIENT.get(PING_COUNTER_KEY)
+if PING_COUNT is None:
+    PING_COUNT = 0
 ISPYB_PING_COUNT: int = _CLIENT.get(ISPYB_PING_COUNTER_KEY)
+if ISPYB_PING_COUNT is None:
+    ISPYB_PING_COUNT = 0
 QUERY_COUNT: int = _CLIENT.get(QUERY_COUNTER_KEY)
+if QUERY_COUNT is None:
+    QUERY_COUNT = 0
 ISPYB_QUERY_COUNT: int = _CLIENT.get(ISPYB_QUERY_COUNTER_KEY)
+if ISPYB_QUERY_COUNT is None:
+    ISPYB_QUERY_COUNT = 0
 
-print(f"ping_count={ISPYB_PING_COUNT}/{PING_COUNT}")
-print(f"query_count={ISPYB_QUERY_COUNT}/{QUERY_COUNT}")
+PING_REDUCTION_PCENT: int = 0
+if PING_COUNT:
+    PING_REDUCTION_PCENT = int(
+        100.0 * (PING_COUNT - ISPYB_PING_COUNT) / PING_COUNT + 0.5
+    )
+
+QUERY_REDUCTION_PCENT: float = 0
+if QUERY_COUNT:
+    QUERY_REDUCTION_PCENT = int(
+        100.0 * (QUERY_COUNT - ISPYB_QUERY_COUNT) / QUERY_COUNT + 0.5
+    )
+
+print(f"ping_count={ISPYB_PING_COUNT}/{PING_COUNT} (reduction={PING_REDUCTION_PCENT}%)")
+print(
+    f"query_count={ISPYB_QUERY_COUNT}/{QUERY_COUNT} (reduction={QUERY_REDUCTION_PCENT}%)"
+)
 
 # Display users and their target access lists.
 # We do this by calling 'memdump' which prints all the keys: -
