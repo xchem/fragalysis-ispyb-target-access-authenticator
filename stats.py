@@ -4,6 +4,7 @@ import subprocess
 from collections import OrderedDict
 from datetime import datetime
 from typing import Any
+from urllib.parse import unquote
 
 from pymemcache.client.retrying import RetryingClient
 
@@ -88,9 +89,10 @@ max_tas: int = 0  # Largest no. of TAS for any user
 for key in sorted(keys):
     if valid_encoded_username(key):
         collected: datetime = _CLIENT.get(get_encoded_username_timestamp_key(key))
+        collected_iso: str = collected.isoformat()
         access: set[str] = _CLIENT.get(key)
         tas = len(access)
-        print(f"encoded-username={key} tas={tas} collected={collected}")
+        print(f"username={unquote(key)} #tas={tas} collected={collected_iso}")
         num_usernames += 1
         num_tas += tas
         max_tas = max(max_tas, tas)
