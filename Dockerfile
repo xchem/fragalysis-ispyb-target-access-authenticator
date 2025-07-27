@@ -40,6 +40,7 @@ ENV PATH=/.venv/bin:$PATH
 RUN apk add libmemcached
 
 COPY stats.py .
+COPY tas.py .
 COPY app/ ./app/
 COPY logging.config .
 COPY docker-entrypoint.sh .
