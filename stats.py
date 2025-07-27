@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 """Prints ping and target-access query stats along with built-in memcached stats."""
+
 import subprocess
 from collections import OrderedDict
 from datetime import datetime
 from typing import Any
-from urllib.parse import unquote
+from urllib.parse import quote, unquote
 
 from pymemcache.client.retrying import RetryingClient
 
@@ -83,19 +84,27 @@ result = subprocess.run(
     ["memdump", "-s", "localhost"], stdout=subprocess.PIPE, check=False
 )
 keys = result.stdout.decode("utf-8").split()
+
+# Unquote and sort usernames
+usernames: list[str] = []
+usernames.extend(unquote(key) for key in keys if valid_encoded_username(key))
+usernames.sort()
+
 num_usernames: int = 0  # Number of usernames cached
 num_tas: int = 0  # Total number of TAS
 max_tas: int = 0  # Largest no. of TAS for any user
-for key in sorted(keys):
-    if valid_encoded_username(key):
-        collected: datetime = _CLIENT.get(get_encoded_username_timestamp_key(key))
-        collected_iso: str = collected.isoformat()
-        access: set[str] = _CLIENT.get(key)
-        tas = len(access)
-        print(f"username={unquote(key)} #tas={tas} collected={collected_iso}")
-        num_usernames += 1
-        num_tas += tas
-        max_tas = max(max_tas, tas)
+for username in usernames:
+    encoded_username: str = quote(username)
+    collected: datetime = _CLIENT.get(
+        get_encoded_username_timestamp_key(encoded_username)
+    )
+    collected_iso: str = collected.isoformat()
+    access: set[str] = _CLIENT.get(encoded_username)
+    tas = len(access)
+    print(f"username='{username}' #tas={tas} collected={collected_iso}")
+    num_usernames += 1
+    num_tas += tas
+    max_tas = max(max_tas, tas)
 
 if num_usernames:
     print("---")
