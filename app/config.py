@@ -5,9 +5,9 @@ import os
 class Config:
     """Simple config module where all environment variables can be found."""
 
-    CACHE_EXPIRY_MINUTES: int = int(os.environ.get("TAA_CACHE_EXPIRY_MINUTES", "8"))
+    CACHE_EXPIRY_MINUTES: int = int(os.environ.get("TAA_CACHE_EXPIRY_MINUTES", "20"))
     PING_CACHE_EXPIRY_SECONDS: int = int(
-        os.environ.get("TAA_PING_CACHE_EXPIRY_SECONDS", "50")
+        os.environ.get("TAA_PING_CACHE_EXPIRY_SECONDS", "55")
     )
 
     ISPYB_HOST: str | None = os.environ.get("TAA_ISPYB_HOST")
