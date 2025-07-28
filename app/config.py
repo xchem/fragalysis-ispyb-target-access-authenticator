@@ -1,11 +1,12 @@
 """Configuration (environment) variables."""
+
 import os
 
 
 class Config:
     """Simple config module where all environment variables can be found."""
 
-    CACHE_EXPIRY_MINUTES: int = int(os.environ.get("TAA_CACHE_EXPIRY_MINUTES", "20"))
+    CACHE_EXPIRY_MINUTES: int = int(os.environ.get("TAA_CACHE_EXPIRY_MINUTES", "15"))
     PING_CACHE_EXPIRY_SECONDS: int = int(
         os.environ.get("TAA_PING_CACHE_EXPIRY_SECONDS", "55")
     )
