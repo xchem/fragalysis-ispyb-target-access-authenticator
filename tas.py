@@ -8,11 +8,13 @@ from datetime import datetime
 from typing import NoReturn
 from urllib.parse import quote
 
+import humanize
 from pymemcache.client.retrying import RetryingClient
 
 from app.common import (
     get_encoded_username_timestamp_key,
     get_memcached_retrying_client,
+    utc_now,
     valid_encoded_username,
 )
 
@@ -42,9 +44,13 @@ _COLLECTED: datetime | None = _CLIENT.get(
 _CLIENT.close()
 
 _COLLECTED_STR: str = _COLLECTED.isoformat() if _COLLECTED else "Nothing collected"
+_AGE_STR: str = "Meaningless"
+if isinstance(_COLLECTED, datetime):
+    _AGE_STR = humanize.naturaldelta(utc_now() - _COLLECTED)
 
 print(f"  Username: '{_USERNAME}' ({_ENCODED_USERNAME})")
 print(f" Collected: {_COLLECTED_STR}")
+print(f" Cache age: {_AGE_STR}")
 print(f"No. of TAS: {len(_TAS)}")
 if _TAS:
     print("   TAS Set:")

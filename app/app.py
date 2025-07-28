@@ -3,7 +3,7 @@
 import json
 import logging
 import multiprocessing
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from logging.config import dictConfig
 from typing import Annotated, Any
 from urllib.parse import quote
@@ -28,6 +28,7 @@ from .common import (
     QUERY_COUNTER_KEY,
     get_encoded_username_timestamp_key,
     get_memcached_retrying_client,
+    utc_now,
     valid_encoded_username,
 )
 from .config import Config
@@ -61,11 +62,6 @@ _VERSION_NAME: str = "XChem Python FastAPI TAS Authenticator"
 # target access strings. if that fails we return the existing cache.
 _MAX_USER_CACHE_AGE: timedelta = timedelta(minutes=Config.CACHE_EXPIRY_MINUTES)
 _MAX_PING_CACHE_AGE: timedelta = timedelta(seconds=Config.PING_CACHE_EXPIRY_SECONDS)
-
-
-def _utc_now() -> datetime:
-    """Get the current time (UTC)."""
-    return datetime.now(timezone.utc)
 
 
 # Do we have sufficient configuration for an SSH connector?
@@ -251,7 +247,7 @@ if Config.ENABLE_DAVE_LISTER:
     dummy_user_client: RetryingClient = get_memcached_retrying_client()
     assert dummy_user_client
     dummy_user_client.set(_DUMMY_USER, set(["sb99999-9"]))
-    dummy_user_client.set(get_encoded_username_timestamp_key(_DUMMY_USER), _utc_now())
+    dummy_user_client.set(get_encoded_username_timestamp_key(_DUMMY_USER), utc_now())
     dummy_user_client.close()
 
 
@@ -300,11 +296,11 @@ def ping():
         )
 
         status_str: str = "NOT OK"
-        utc_now: datetime = _utc_now()
+        now: datetime = utc_now()
         if (
             pre_ping_status is None
             or not ping_cache_timestamp
-            or utc_now - ping_cache_timestamp > _MAX_PING_CACHE_AGE
+            or now - ping_cache_timestamp > _MAX_PING_CACHE_AGE
         ):
             _LOGGER.debug("ping cache value is too old - refreshing...")
             if ssh_connector := _get_connector():
@@ -313,7 +309,7 @@ def ping():
                 status_str = "OK"
             client.incr(ISPYB_PING_COUNTER_KEY, 1)
             client.set(PING_CACHE_KEY, status_str)
-            client.set(PING_CACHE_TIMESTAMP_KEY, utc_now)
+            client.set(PING_CACHE_TIMESTAMP_KEY, now)
         else:
             # Ping has not expired and should be set to something...
             status_str = pre_ping_status
@@ -375,12 +371,12 @@ def get_taa_user_tas(
         user_cache_timestamp: datetime = _try_memcached_client_get(
             client, user_timestamp_key
         )
-        utc_now: datetime = _utc_now()
+        now: datetime = utc_now()
         user_cache: set[str] = set()
         if (
             existing_cache is None
             or not user_cache_timestamp
-            or utc_now - user_cache_timestamp > _MAX_USER_CACHE_AGE
+            or now - user_cache_timestamp > _MAX_USER_CACHE_AGE
         ):
             _LOGGER.debug("Attempting to refresh the cache for '%s'...", username)
             remote_tas_set: set[str] | None = _get_tas_from_remote_ispyb(
@@ -400,7 +396,7 @@ def get_taa_user_tas(
             )
             client.incr(ISPYB_QUERY_COUNTER_KEY, 1)
             client.set(encoded_username, user_cache)
-            client.set(user_timestamp_key, utc_now)
+            client.set(user_timestamp_key, now)
         else:
             # Cache has not expired and should be set to something...
             user_cache = existing_cache

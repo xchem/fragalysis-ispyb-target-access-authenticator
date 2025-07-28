@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from dateutil.parser import parse
 from pymemcache.client.base import Client
@@ -59,6 +59,11 @@ class TaSerde:
 
 
 _TA_SERDE: TaSerde = TaSerde()
+
+
+def utc_now() -> datetime:
+    """Get the current time (UTC)."""
+    return datetime.now(timezone.utc)
 
 
 def get_encoded_username_timestamp_key(encoded_username: str) -> str:

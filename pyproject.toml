@@ -16,6 +16,7 @@ ispyb = "4.13.2"
 # ispyb (4.13.2) depends on mysql-connector (<2.2.3)
 mysql-connector = "2.1.7"
 # Flexible versions
+humanize = "^4.12.3"
 prometheus-client = "^0.22.1"
 pymemcache = "^4.0.0"
 pydantic = "^2.10.6"
