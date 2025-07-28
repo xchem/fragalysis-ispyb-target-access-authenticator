@@ -12,6 +12,7 @@ from pymemcache.client.retrying import RetryingClient
 from app.common import (
     ISPYB_PING_COUNTER_KEY,
     ISPYB_QUERY_COUNTER_KEY,
+    PING_CACHE_KEY,
     PING_COUNTER_KEY,
     QUERY_COUNTER_KEY,
     get_encoded_username_timestamp_key,
@@ -33,6 +34,9 @@ for key, value in _O_STATS.items():
 print("---")
 
 # Display our own stats (ping/query counts)
+
+PING_STATUS: str | None = _CLIENT.get(PING_CACHE_KEY)
+PING_STATUS_STR: str = PING_STATUS or "Unknown"
 
 PING_COUNT: int = _CLIENT.get(PING_COUNTER_KEY)
 if PING_COUNT is None:
@@ -59,6 +63,7 @@ if QUERY_COUNT:
         100.0 * (QUERY_COUNT - ISPYB_QUERY_COUNT) / QUERY_COUNT + 0.5
     )
 
+print(f"ping_status='{PING_STATUS_STR}")
 print(f"ping_count={ISPYB_PING_COUNT}/{PING_COUNT} (reduction={PING_REDUCTION_PCENT}%)")
 print(
     f"query_count={ISPYB_QUERY_COUNT}/{QUERY_COUNT} (reduction={QUERY_REDUCTION_PCENT}%)"
