@@ -47,6 +47,5 @@ jobs:
     - name: Build and Push (Tag)
       uses: docker/build-push-action@v6
       with:
-        platforms: linux/amd64,linux/arm64
         tags: ${{ env.owner }}/fragalysis-ispyb-target-access-authenticator:${{ github.ref_name }}
         push: true
