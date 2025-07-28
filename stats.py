@@ -63,7 +63,7 @@ if QUERY_COUNT:
         100.0 * (QUERY_COUNT - ISPYB_QUERY_COUNT) / QUERY_COUNT + 0.5
     )
 
-print(f"ping_status='{PING_STATUS_STR}")
+print(f"ping_status='{PING_STATUS_STR}'")
 print(f"ping_count={ISPYB_PING_COUNT}/{PING_COUNT} (reduction={PING_REDUCTION_PCENT}%)")
 print(
     f"query_count={ISPYB_QUERY_COUNT}/{QUERY_COUNT} (reduction={QUERY_REDUCTION_PCENT}%)"
