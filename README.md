@@ -29,8 +29,8 @@ of target access strings.
 Any service implementation can be deployed, this one provides remote (SSH) access to
 ISPyB using a container image based on Python and [FastAPI].
 
-The stack's _contract_ requires the following endpoints from any implementation
-of the authenticator: -
+The stack's _contract_ with the TA authenticator requires the following endpoints
+from any implementation of the authenticator: -
 
 ### `/version` **[GET]**
 
@@ -86,7 +86,7 @@ statistics: -
 
     ./stats.py
 
-Tou can also display the cached target-access strings for a given user by providing
+You can also display the cached target-access strings for a given user by providing
 a username to the `tas.py` utility: -
 
     ./tas.py 'dave lister'
@@ -142,8 +142,10 @@ target access results for a user with `httpie`. Here we query user `abc`
 
     http localhost:8080/target-access/abc 'x-taaquerykey:blob1234'
 
-To get some built-in results, if you've set the `TAA_ENABLE_DAVE_LISTER` environment
-variable to `yes`, you can get some realistic test results with that username: -
+To get some test results, if you've set the `TAA_ENABLE_DAVE_LISTER` environment
+variable to `yes`, you can get some realistic test results with that username.
+This is not a real user, it is simply one that the authentication "simulates" with
+a fixed set of target access strings: -
 
     http localhost:8080/target-access/dave%20lister 'x-taaquerykey:blob1234'
 
