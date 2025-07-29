@@ -159,6 +159,16 @@ You can terminate the local installation with: -
 
     docker compose down
 
+## The "mock" authenticator
+We have also developed a "mock" authenticator that "looks and feels" like the
+_real thing_. It offers the same API, can run locally, and is configured
+using text files that list users and their target-access strings. It does not
+need an ISPyB service but behaves as though it has one.
+
+See: -
+
+- https://github.com/xchem/fragalysis-mock-target-access-authenticator
+
 ---
 
 [black]: https://black.readthedocs.io/en/stable
