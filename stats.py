@@ -92,10 +92,10 @@ if QUERY_COUNT:
     )
 
 print(f"ping_status='{PING_STATUS_STR}'")
-print(f"ping_timestamp='{PING_TIMESTAMP_STR}'")
-print(f"ping_age='{PING_AGE_STR}'")
-print(f"ping_status_change_timestamp='{PING_STATUS_CHANGE_TIMESTAMP_STR}'")
-print(f"ping_status_change_age='{PING_STATUS_CHANGE_AGE_STR}'")
+print(f"ping_timestamp={PING_TIMESTAMP_STR}")
+print(f"ping_age={PING_AGE_STR}")
+print(f"ping_status_change_timestamp={PING_STATUS_CHANGE_TIMESTAMP_STR}")
+print(f"ping_status_change_age={PING_STATUS_CHANGE_AGE_STR}")
 print(f"ping_count={ISPYB_PING_COUNT}/{PING_COUNT} (reduction={PING_REDUCTION_PCENT}%)")
 print(
     f"query_count={ISPYB_QUERY_COUNT}/{QUERY_COUNT} (reduction={QUERY_REDUCTION_PCENT}%)"
