@@ -5,12 +5,12 @@
 services:
 
   memcached:
-    image: memcached:1.6.38-alpine3.21
+    image: memcached:1.6.39-alpine3.22
     container_name: memcached
-    environment:
-      MEMCACHED_MAX_ITEM_SIZE: 8000
-      MEMCACHED_MAX_CONNECTIONS: 1
-      MEMCACHED_MEMORY_LIMIT: 64
+    command:
+      - -vv
+      - --disable-evictions
+      - --memory-limit=64
     ports:
     - '11211:11211'
 
