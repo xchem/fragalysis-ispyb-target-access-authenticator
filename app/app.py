@@ -25,6 +25,7 @@ from .common import (
     PING_CACHE_KEY,
     PING_CACHE_TIMESTAMP_KEY,
     PING_COUNTER_KEY,
+    PING_STATUS_CHANGE_TIMESTAMP_KEY,
     QUERY_COUNTER_KEY,
     get_encoded_username_timestamp_key,
     get_memcached_retrying_client,
@@ -314,10 +315,11 @@ def ping():
             # Ping has not expired and should be set to something...
             status_str = pre_ping_status
 
-        client.close()
-
         if status_str != pre_ping_status:
             _LOGGER.info("New ISPyB PING status [%s->%s]", pre_ping_status, status_str)
+            client.set(PING_STATUS_CHANGE_TIMESTAMP_KEY, now)
+
+        client.close()
 
     return TargetAccessGetPingResponse(ping=status_str)
 

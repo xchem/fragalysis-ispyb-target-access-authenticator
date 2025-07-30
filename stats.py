@@ -7,16 +7,20 @@ from datetime import datetime
 from typing import Any
 from urllib.parse import quote, unquote
 
+import humanize
 from pymemcache.client.retrying import RetryingClient
 
 from app.common import (
     ISPYB_PING_COUNTER_KEY,
     ISPYB_QUERY_COUNTER_KEY,
     PING_CACHE_KEY,
+    PING_CACHE_TIMESTAMP_KEY,
     PING_COUNTER_KEY,
+    PING_STATUS_CHANGE_TIMESTAMP_KEY,
     QUERY_COUNTER_KEY,
     get_encoded_username_timestamp_key,
     get_memcached_retrying_client,
+    utc_now,
     valid_encoded_username,
 )
 
@@ -51,6 +55,30 @@ ISPYB_QUERY_COUNT: int = _CLIENT.get(ISPYB_QUERY_COUNTER_KEY)
 if ISPYB_QUERY_COUNT is None:
     ISPYB_QUERY_COUNT = 0
 
+now: datetime = utc_now()
+
+PING_STATUS_CHANGE_TIMESTAMP: datetime | None = _CLIENT.get(
+    PING_STATUS_CHANGE_TIMESTAMP_KEY
+)
+PING_STATUS_CHANGE_TIMESTAMP_STR: str = (
+    PING_STATUS_CHANGE_TIMESTAMP.isoformat()
+    if PING_STATUS_CHANGE_TIMESTAMP
+    else "No change yet"
+)
+PING_STATUS_CHANGE_AGE_STR: str = "Meaningless"
+if isinstance(PING_STATUS_CHANGE_TIMESTAMP, datetime):
+    PING_STATUS_CHANGE_AGE_STR = humanize.naturaldelta(
+        now - PING_STATUS_CHANGE_TIMESTAMP
+    )
+
+PING_TIMESTAMP: datetime | None = _CLIENT.get(PING_CACHE_TIMESTAMP_KEY)
+PING_TIMESTAMP_STR: str = (
+    PING_TIMESTAMP.isoformat() if PING_TIMESTAMP else "No ping yet"
+)
+PING_AGE_STR: str = "Meaningless"
+if isinstance(PING_TIMESTAMP, datetime):
+    PING_AGE_STR = humanize.naturaldelta(now - PING_TIMESTAMP)
+
 PING_REDUCTION_PCENT: int = 0
 if PING_COUNT:
     PING_REDUCTION_PCENT = int(
@@ -64,6 +92,10 @@ if QUERY_COUNT:
     )
 
 print(f"ping_status='{PING_STATUS_STR}'")
+print(f"ping_timestamp='{PING_TIMESTAMP_STR}'")
+print(f"ping_age='{PING_AGE_STR}'")
+print(f"ping_status_change_timestamp='{PING_STATUS_CHANGE_TIMESTAMP_STR}'")
+print(f"ping_status_change_age='{PING_STATUS_CHANGE_AGE_STR}'")
 print(f"ping_count={ISPYB_PING_COUNT}/{PING_COUNT} (reduction={PING_REDUCTION_PCENT}%)")
 print(
     f"query_count={ISPYB_QUERY_COUNT}/{QUERY_COUNT} (reduction={QUERY_REDUCTION_PCENT}%)"

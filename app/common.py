@@ -17,6 +17,9 @@ ISPYB_QUERY_COUNTER_KEY: str = "ispyb-query-counter"
 TIMESTAMP_KEY_PREFIX: str = "timestamp-"
 
 PING_CACHE_TIMESTAMP_KEY: str = f"{TIMESTAMP_KEY_PREFIX}{PING_CACHE_KEY}"
+PING_STATUS_CHANGE_TIMESTAMP_KEY: str = (
+    f"{TIMESTAMP_KEY_PREFIX}ispyb-ping-status-change"
+)
 
 # List of invalid (reserved) usernames
 INVALID_USERNAMES: set[str] = {
