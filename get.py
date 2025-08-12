@@ -29,12 +29,14 @@ _QUERY_KEY: str = os.environ["TAA_QUERY_KEY"]
 if not valid_encoded_username(_ENCODED_USERNAME):
     error(f'"{_USERNAME}" is not a valid username')
 
-# Get the Target Access strings for the user
-# and the time they were collected
+# Trigger a local request (using the API)
+# to get the Target Access strings for the user
 resp: requests.Response = requests.get(
     f"http://auth/target-access/{_ENCODED_USERNAME}",
     headers={"X-TAAQueryKey": _QUERY_KEY},
     timeout=4,
 )
-if resp.status_code != 200:
+if resp.status_code == 200:
+    print(resp.text)
+else:
     error(f"Failed get request ({resp.status_code}) '{resp.text}")
