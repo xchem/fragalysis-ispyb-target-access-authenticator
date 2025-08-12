@@ -91,6 +91,16 @@ a username to the `tas.py` utility: -
 
     ./tas.py 'dave lister'
 
+You can clear individual user records with `clear.py`: -
+
+    ./clear.py 'dave lister'
+
+And trigger the local API to simulate a client query with `get.py`,
+which also prints the results; -
+
+    ./get.py 'dave lister'
+    '{"count":3,"target_access":["aa00000-1","aa00000-254","aa00000-2"]}'
+
 ## Contributing
 The project uses: -
 
