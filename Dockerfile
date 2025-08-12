@@ -40,7 +40,6 @@ ENV PATH=/.venv/bin:$PATH
 RUN apk add libmemcached
 
 COPY clear.py .
-COPY get.py .
 COPY stats.py .
 COPY tas.py .
 COPY app/ ./app/

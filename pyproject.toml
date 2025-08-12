@@ -17,19 +17,18 @@ ispyb = "4.13.2"
 mysql-connector = "2.1.7"
 # Flexible versions
 humanize = "^4.12.3"
+httpie = "^3.2.4"
 prometheus-client = "^0.22.1"
 pymemcache = "^4.0.0"
 pydantic = "^2.10.6"
 pymysql = "^1.1.1"
 python = "^3.12"
 python-dateutil = "^2.9.0"
-requests = "^2.32.4"
 sshtunnel = "^0.4.0"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^4.2.0"
 pylint = "^3.3.7"
-httpie = "^3.2.4"
 isort = "^6.0.1"
 black = "^25.1.0"
 
