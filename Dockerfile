@@ -39,6 +39,8 @@ ENV PATH=/.venv/bin:$PATH
 # This allows us to run 'memdump -s localhost' to display all the keys.
 RUN apk add libmemcached
 
+COPY clear.py .
+COPY get.py .
 COPY stats.py .
 COPY tas.py .
 COPY app/ ./app/

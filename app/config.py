@@ -29,7 +29,7 @@ class Config:
 
     QUERY_KEY: str | None = os.getenv("TAA_QUERY_KEY")
 
-    TAS_CODES: str = os.environ.get("TAA_TAS_CODES", "lb")
+    TAS_CODES: str = os.environ.get("TAA_TAS_CODES", "lb,sw")
     TAS_CODES_SET: set[str] = set(TAS_CODES.split(",")) if TAS_CODES else set()
 
     # Do we enable the built-in test user?

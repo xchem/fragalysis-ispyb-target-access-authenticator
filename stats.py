@@ -23,6 +23,7 @@ from app.common import (
     utc_now,
     valid_encoded_username,
 )
+from app.config import Config
 
 _CLIENT: RetryingClient = get_memcached_retrying_client()
 
@@ -151,6 +152,7 @@ print(f"total usernames={num_usernames}")
 print(f"total tas={num_tas}")
 print(f"max tas={max_tas}")
 print(f"avg tas={avg_tas}")
+print(f"code set={Config.TAS_CODES_SET}")
 
 # Done
 

@@ -23,6 +23,7 @@ pydantic = "^2.10.6"
 pymysql = "^1.1.1"
 python = "^3.12"
 python-dateutil = "^2.9.0"
+requests = "^2.32.4"
 sshtunnel = "^0.4.0"
 
 [tool.poetry.group.dev.dependencies]
@@ -33,7 +34,7 @@ isort = "^6.0.1"
 black = "^25.1.0"
 
 [tool.pylint.'MESSAGES CONTROL']
-disable = "too-many-boolean-expressions,too-few-public-methods,too-many-arguments,too-many-positional-arguments,missing-function-docstring,missing-module-docstring,missing-class-docstring"
+disable = "duplicate-code,too-many-boolean-expressions,too-few-public-methods,too-many-arguments,too-many-positional-arguments,missing-function-docstring,missing-module-docstring,missing-class-docstring"
 
 [build-system]
 requires = ["poetry-core"]
