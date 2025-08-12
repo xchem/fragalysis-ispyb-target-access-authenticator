@@ -29,7 +29,9 @@ class Config:
 
     QUERY_KEY: str | None = os.getenv("TAA_QUERY_KEY")
 
-    TAS_CODES: str = os.environ.get("TAA_TAS_CODES", "lb,sw")
+    # What proposal codes are we limited to?
+    # It's empty (all codes) or a comma-separated set of codes like "lb,sw"
+    TAS_CODES: str = os.environ.get("TAA_TAS_CODES", "")
     TAS_CODES_SET: set[str] = set(TAS_CODES.split(",")) if TAS_CODES else set()
 
     # Do we enable the built-in test user?
