@@ -197,10 +197,12 @@ def _get_tas_from_remote_ispyb(username: str) -> set[str] | None:
         if "proposalCode" in record and record["proposalCode"] in Config.TAS_CODES_SET:
             pc_str = f'{record["proposalCode"]}'
             pn_str = f'{record["proposalNumber"]}'
-            sn_str = f'{record["sessionNumber"]}'
             proposal_str = f"{pc_str}{pn_str}"
-            proposal_visit_str = f"{proposal_str}-{sn_str}"
-            prop_id_set.update([proposal_str, proposal_visit_str])
+            sn_str = f'{record["sessionNumber"]}'
+            if sn_str:
+                prop_id_set.add(f"{proposal_str}-{sn_str}")
+            else:
+                prop_id_set.add(proposal_str)
 
     # Display the collected results for the user.
     # These will be cached.
