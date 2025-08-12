@@ -191,7 +191,6 @@ def _get_tas_from_remote_ispyb(username: str) -> set[str] | None:
     #      Code   |   Session
     #          Proposal
     for record in rs:
-        print(f"{username}: {record}")
         if "proposalCode" in record:
             pc_str = f'{record["proposalCode"]}'
             if not pc_str:
