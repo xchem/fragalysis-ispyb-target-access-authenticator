@@ -78,9 +78,9 @@ if (
 ):
     # Create a connector
     _SSH_CONNECTOR_CONFIGURED = True
-    _LOGGER.info("I have sufficient configuration to establish an SSH connection")
+    _LOGGER.info("Config OK - Can establish ISPyB connections")
 else:
-    _LOGGER.warning("Insufficient configuration to establish an SSH connection")
+    _LOGGER.warning("Insufficient configuration to establish ISPyB connections")
 
 # Get our version (from the 'VERSION' file)
 with open("VERSION", "r", encoding="utf-8") as version_file:
