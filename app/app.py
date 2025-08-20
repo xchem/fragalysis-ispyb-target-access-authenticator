@@ -198,7 +198,18 @@ def _get_tas_from_remote_ispyb(username: str) -> set[str] | None:
                 continue
             if not Config.TAS_CODES_SET or pc_str in Config.TAS_CODES_SET:
                 pn_str = f'{record["proposalNumber"]}'
-                if sn_str := f'{record["sessionNumber"]}':
+                sn_str = f'{record["sessionNumber"]}'
+                # We'll use these values if they represent integers...
+                pn_int = None
+                sn_int = None
+                try:
+                    pn_int = int(pn_str)
+                    sn_int = int(sn_str)
+                except ValueError:
+                    _LOGGER.warning(
+                        "Proposal or session is not a number (%s, %s)", pn_str, sn_str
+                    )
+                if pn_int and sn_int:
                     # OK - add "<code><proposalNum>-<sessionNum>"
                     prop_id_set.add(f"{pc_str}{pn_str}-{sn_str}")
 
