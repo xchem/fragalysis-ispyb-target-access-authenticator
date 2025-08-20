@@ -183,13 +183,14 @@ def _get_tas_from_remote_ispyb(username: str) -> set[str] | None:
     # If this is not set (is blank) we collect all codes.
     #
     # The resultant strings should correspond to a title value in a Project record.
-    # And we should get this sort of set: -
+    # We only return records where there is a sessionNumber,
+    # and we should get this sort of set: -
     #
-    #       {"lb12345", "lb12345-1"}
-    #                    --      -
-    #                    | ----- |
-    #                 Code   |   Session
-    #                     Proposal
+    #       {"lb12345-20", "lb12345-22"}
+    #                       --      --
+    #                        | ----- |
+    #                     Code   |   Session
+    #                         Proposal
     for record in rs:
         if "proposalCode" in record:
             pc_str = f'{record["proposalCode"]}'
@@ -197,12 +198,9 @@ def _get_tas_from_remote_ispyb(username: str) -> set[str] | None:
                 continue
             if not Config.TAS_CODES_SET or pc_str in Config.TAS_CODES_SET:
                 pn_str = f'{record["proposalNumber"]}'
-                proposal_str = f"{pc_str}{pn_str}"
-                # Always add the <code><proposal>
-                prop_id_set.add(proposal_str)
                 if sn_str := f'{record["sessionNumber"]}':
-                    # Also add <code><proposal>-<visit>
-                    prop_id_set.add(f"{proposal_str}-{sn_str}")
+                    # OK - add "<code><proposalNum>-<sessionNum>"
+                    prop_id_set.add(f"{pc_str}{pn_str}-{sn_str}")
 
     # Display the collected results for the user.
     # These will be cached.
