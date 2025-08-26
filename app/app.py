@@ -395,21 +395,27 @@ def get_taa_user_tas(
             remote_tas_set: set[str] | None = _get_tas_from_remote_ispyb(
                 username=username
             )
+            # Always increment the query count
+            client.incr(ISPYB_QUERY_COUNTER_KEY, 1)
+            # Did we get anything (None indicates an error)
             if remote_tas_set is not None:
                 # Got something (may be empty).
                 # An empty list is considered successful - it means the user is known
                 # but does not have access to any proposals/visits.
                 user_cache = remote_tas_set
+                # Reset the user's cache timestamp.
+                # We'll try this user again at the next expiry.
+                _LOGGER.info(
+                    "Cache replacement for '%s' (size=%d)", username, len(user_cache)
+                )
+                client.set(encoded_username, user_cache)
+                client.set(user_timestamp_key, now)
             else:
                 _LOGGER.warning("Failed to get TAS set for '%s'", username)
-            # Reset the user's cache timestamp regardless of success.
-            # We'll try this user again at the next expiry.
-            _LOGGER.info(
-                "Cache replacement for '%s' (size=%d)", username, len(user_cache)
-            )
-            client.incr(ISPYB_QUERY_COUNTER_KEY, 1)
-            client.set(encoded_username, user_cache)
-            client.set(user_timestamp_key, now)
+                # Resulty was 'None' - indicates an ISPyB failure.
+                # Do nothing - try this user again next time we get a query.
+                # For now we'll just return an empty set for the user_cache
+                # (set earlier)
         else:
             # Cache has not expired and should be set to something...
             user_cache = existing_cache
