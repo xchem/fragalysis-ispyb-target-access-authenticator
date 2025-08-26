@@ -80,23 +80,30 @@ authenticator is able to connect to the underlying (ISPyB) service. The string
 is not `OK` if there are problems.
 
 ### In-container debug
-Two debug modules are contained in the image: `stats.py` and `tas.py`. To displayed
-detailed stats for the authentication container you can shell-into it and display
-statistics: -
+A number of debug tools are shipped with the image. If you can _shell_ into
+the corresponding container you can run them from the command line.
+The authenticator is typically deployed in a kubernetes **Pod** as
+a container called **ta-authenticator**, co-located with a **memcached**
+container (in the same **Pod**).
+
+To display detailed "global" stats for the authentication container you can run: -
 
     ./stats.py
 
-You can also display the cached target-access strings for a given user by providing
-a username to the `tas.py` utility: -
+You can display (but not get) the cached target-access strings
+for a given user (along with the cache collection time and age) 
+by providing a username to the `tas.py` utility: -
 
-    ./tas.py 'dave lister'
+    ./tas.py abc12345
 
-You can clear individual user records with `clear.py`: -
+You can clear individual user records with `clear.py`.
+This simply clears the cache, forcing a new collection of
+values at the next opportunity: -
 
-    ./clear.py 'dave lister'
+    ./clear.py abc12345
 
-And trigger the local API to simulate a client query with `get.py`,
-which also prints the results; -
+`get.py uses the local API to simulate a stack query which will refresh
+the cache if it required while also printing the results; -
 
     ./get.py 'dave lister'
     '{"count":3,"target_access":["aa00000-1","aa00000-254","aa00000-2"]}'
