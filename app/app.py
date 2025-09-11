@@ -206,7 +206,7 @@ def _get_tas_from_remote_ispyb(username: str) -> set[str] | None:
                     pn_int = int(pn_str)
                     sn_int = int(sn_str)
                 except ValueError:
-                    _LOGGER.warning(
+                    _LOGGER.debug(
                         "Proposal or session is not a number (%s, %s)", pn_str, sn_str
                     )
                 if pn_int and sn_int:
