@@ -448,7 +448,7 @@ def get_taa_user_tas(
     )
 
 
-@stats.get("/stats/", status_code=status.HTTP_200_OK)
+@stats.get("/", status_code=status.HTTP_200_OK)
 def get_stats(
     x_taastatskey: Annotated[str | None, Header()] = None,
 ) -> StatsResponse:
