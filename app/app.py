@@ -452,9 +452,11 @@ def get_stats(
     # Get the base statistics (a map)
     data = get_statistics()
     # And add some extra stuff...
-    data["kind"] = _VERSION_KIND
-    data["name"] = _VERSION_NAME
-    data["version"] = _VERSION
+    data["auth"] = {
+        "kind": _VERSION_KIND,
+        "name": _VERSION_NAME,
+        "version": _VERSION,
+    }
     return Response(
         content=yaml.dump(data, default_flow_style=False),
         media_type="text/plain",
