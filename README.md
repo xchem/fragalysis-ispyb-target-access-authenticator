@@ -109,9 +109,20 @@ the cache if it required while also printing the results; -
     '{"count":3,"target_access":["aa00000-1","aa00000-254","aa00000-2"]}'
 
 ### HTTP debug
-If an ingress is deployed an HTTP service can be used to invoke the container's
+If an **Ingress** is deployed an HTTP service can be used to invoke the container's
 statistics endpoint on port `8081.` This is a `text/plain` response replicating
 the behaviour of the in-container stats utility described above.
+
+If a header key is required for the statistics (an option), it is usually a [shortuuid]
+value. If a key is required you will need to provide this in your request header
+as the value to `X-TAAStatsKey`. In this example we use [httpie] to get the stats from
+an authenticator deployed with the key `24pp4CmJP2wCz2EiGgCctG`: -
+
+    http https://authenticator.example.com X-TAAStatsKey:24pp4CmJP2wCz2EiGgCctG
+
+And the same thing using `curl`: -
+
+    curl https://authenticator.example.com -H X-TAAStatsKey:24pp4CmJP2wCz2EiGgCctG
 
 ## Contributing
 The project uses: -
@@ -199,5 +210,7 @@ See: -
 [environment variables]: https://docs.docker.com/compose/how-tos/environment-variables/set-environment-variables/
 [fastapi]: https://fastapi.tiangolo.com
 [fragalysis-backend]: https://github.com/xchem/fragalysis-backend
+[httpie]: https://httpie.io
 [poetry]: https://python-poetry.org
 [pre-commit]: https://pre-commit.com
+[shortuuid]: https://pypi.org/project/shortuuid/
