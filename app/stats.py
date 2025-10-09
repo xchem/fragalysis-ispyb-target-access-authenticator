@@ -159,8 +159,7 @@ def get_statistics() -> dict[str, Any]:
         num_tas += tas
         max_tas = max(max_tas, tas)
 
-    if num_usernames:
-        print("---")
+    client.close()
 
     avg_tas: int = 0 if num_usernames == 0 else int(0.5 + num_tas / num_usernames)
     stats_response["users"] = {
@@ -172,7 +171,5 @@ def get_statistics() -> dict[str, Any]:
     }
 
     # Done
-
-    client.close()
 
     return stats_response
