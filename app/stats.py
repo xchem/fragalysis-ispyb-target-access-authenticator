@@ -26,7 +26,7 @@ from app.common import (
 from app.config import Config
 
 
-def get_stats() -> dict[str, Any]:
+def get_statistics() -> dict[str, Any]:
     """Returns a detailed collection of stats as a dictionary of keys and values."""
 
     stats_response: dict[str, Any] = {}

@@ -35,6 +35,7 @@ from .common import (
 )
 from .config import Config
 from .remote_ispyb_connector import SSHConnector
+from .stats import get_statistics
 
 # Configure logging
 print("Configuring logging...")
@@ -464,5 +465,5 @@ def get_stats(
         kind=_VERSION_KIND,
         name=_VERSION_NAME,
         version=_VERSION,
-        stats=yaml.dump(get_stats(), default_flow_style=False),
+        stats=yaml.dump(get_statistics(), default_flow_style=False),
     )
