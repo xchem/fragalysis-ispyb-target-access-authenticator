@@ -2,7 +2,7 @@
 
 ![GitHub Release](https://img.shields.io/github/v/release/xchem/fragalysis-ispyb-target-access-authenticator?include_prereleases)
 
-[![build](https://github.com/xchem/fragalysis-ispyb-target-access-authenticator/actions/workflows/build.yaml/badge.svg)](https://github.com/xchem/fragalysis-ispyb-target-access-authenticator/actions/workflows/build.yaml)
+[![latest](https://github.com/xchem/fragalysis-ispyb-target-access-authenticator/actions/workflows/latest.yaml/badge.svg)](https://github.com/xchem/fragalysis-ispyb-target-access-authenticator/actions/workflows/latest.yaml)
 [![tag](https://github.com/xchem/fragalysis-ispyb-target-access-authenticator/actions/workflows/tag.yaml/badge.svg)](https://github.com/xchem/fragalysis-ispyb-target-access-authenticator/actions/workflows/tag.yaml)
 
 [![License](http://img.shields.io/badge/license-Apache%202.0-blue.svg?style=flat)](https://github.com/xchem/fragalysis-ispyb-target-access-authenticator/blob/master/LICENSE.txt)
@@ -91,7 +91,7 @@ To display detailed "global" stats for the authentication container you can run:
     ./stats.py
 
 You can display (but not get) the cached target-access strings
-for a given user (along with the cache collection time and age) 
+for a given user (along with the cache collection time and age)
 by providing a username to the `tas.py` utility: -
 
     ./tas.py abc12345
