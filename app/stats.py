@@ -156,7 +156,7 @@ def get_stats() -> dict[str, Any]:
     if num_usernames:
         print("---")
 
-    avg_tas: float = 0 if num_usernames == 0 else num_tas / num_usernames
+    avg_tas: int = 0 if num_usernames == 0 else int(0.5 + num_tas / num_usernames)
     stats_response["users"] = {
         "total_usernames": num_usernames,
         "total_tas_count": num_tas,
