@@ -1,3 +1,5 @@
+"""Handle logic connecting to the ISPyB server & database"""
+
 import logging
 import threading
 import time
@@ -33,6 +35,8 @@ PYMYSQL_EXCEPTION_RECONNECT_DELAY_S = 1
 
 
 class SSHConnector(Connector):
+    """An SSH connector"""
+
     def __init__(self):
         self.conn_inactivity = Config.ISPYB_CONN_INACTIVITY
         self.lock: threading.Lock = threading.Lock()
@@ -73,6 +77,7 @@ class SSHConnector(Connector):
         db_pass,
         db_name,
     ):
+        """Connect to the remote server"""
         sshtunnel.SSH_TIMEOUT = 5.0
         sshtunnel.TUNNEL_TIMEOUT = 5.0
         sshtunnel.DEFAULT_LOGLEVEL = logging.ERROR
@@ -171,6 +176,7 @@ class SSHConnector(Connector):
         self.last_activity_ts = time.time()
 
     def create_cursor(self):
+        """Create a server/db cursor"""
         if (
             not self.last_activity_ts
             or time.time() - self.last_activity_ts > self.conn_inactivity
@@ -187,6 +193,7 @@ class SSHConnector(Connector):
         return cursor
 
     def call_sp_retrieve(self, procname, args):
+        """Retrieve server results"""
         assert self.conn
         with self.lock:
             cursor = self.create_cursor()
@@ -194,7 +201,7 @@ class SSHConnector(Connector):
                 cursor.callproc(procname=procname, args=args)
             except self.conn.DataError as e:
                 raise ISPyBRetrieveFailed(
-                    f"DataError({e.errno}): {traceback.format_exc()}"
+                    f"DataError({e}): {traceback.format_exc()}"
                 ) from e
 
             result = cursor.fetchall()
@@ -205,6 +212,7 @@ class SSHConnector(Connector):
         return result
 
     def stop(self):
+        """Stop the server"""
         if self.server is not None:
             self.server.stop()
         self.server = None

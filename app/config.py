@@ -28,6 +28,7 @@ class Config:
     MEMCACHED_LOCATION: str = os.getenv("TAA_MEMCACHED_LOCATION", "localhost")
 
     QUERY_KEY: str | None = os.getenv("TAA_QUERY_KEY")
+    STATS_KEY: str | None = os.getenv("TAA_STATS_KEY")
 
     # What proposal codes are we limited to?
     # It's empty (all codes) or a comma-separated set of codes like "lb,sw"

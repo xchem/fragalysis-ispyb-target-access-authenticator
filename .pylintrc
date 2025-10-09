@@ -1,0 +1,13 @@
+[messages control]
+
+# Disable some distracting checks.
+# See http://pylint.pycqa.org/en/latest/user_guide/message-control.html
+#
+# C : Convention warnings
+# R : Refactoring warnings
+disable = too-few-public-methods,
+          too-many-arguments,
+          too-many-boolean-expressions,
+          too-many-locals,
+          too-many-positional-arguments,
+          too-many-statements

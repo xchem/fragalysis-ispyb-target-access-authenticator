@@ -9,6 +9,7 @@ from typing import Annotated, Any
 from urllib.parse import quote
 
 import sshtunnel
+import yaml
 from fastapi import (
     FastAPI,
     Header,
@@ -50,7 +51,8 @@ _LOGGER = logging.getLogger(__name__)
 
 _SEMAPHORE = multiprocessing.Semaphore()
 
-app = FastAPI()
+auth = FastAPI()
+stats = FastAPI()
 
 _VERSION_KIND: str = "ISPYB"
 _VERSION_NAME: str = "XChem Python FastAPI TAS Authenticator"
@@ -112,6 +114,19 @@ class TargetAccessGetUserTasResponse(BaseModel):
     count: int
     # Possibly empty set of Target Access strings
     target_access: set[str]
+
+
+class StatsResponse(BaseModel):
+    """/stats/ GET response."""
+
+    # Version information
+    kind: str
+    name: str
+    version: str
+
+    # Basically a string representation
+    # of a Python dictionary of keys and values.
+    stats: str
 
 
 def _get_connector() -> SSHConnector | None:
@@ -277,7 +292,7 @@ counter_client.close()
 # Endpoints (in-cluster) for the ISPyP Authenticator -----------------------------------
 
 
-@app.get("/version/", status_code=status.HTTP_200_OK)
+@auth.get("/version/", status_code=status.HTTP_200_OK)
 def get_taa_version() -> TargetAccessGetVersionResponse:
     """Returns our version information"""
     return TargetAccessGetVersionResponse(
@@ -287,7 +302,7 @@ def get_taa_version() -> TargetAccessGetVersionResponse:
     )
 
 
-@app.get("/ping/", status_code=status.HTTP_200_OK)
+@auth.get("/ping/", status_code=status.HTTP_200_OK)
 def ping():
     """Returns 'OK' if we can communicate with the underlying ISPyB service
     (i.e. create a connector). Anything other than 'OK' indicates a problem.
@@ -335,7 +350,7 @@ def ping():
     return TargetAccessGetPingResponse(ping=status_str)
 
 
-@app.get("/target-access/{username}", status_code=status.HTTP_200_OK)
+@auth.get("/target-access/{username}", status_code=status.HTTP_200_OK)
 def get_taa_user_tas(
     username: str,
     x_taaquerykey: Annotated[str | None, Header()] = None,
@@ -429,4 +444,25 @@ def get_taa_user_tas(
     return TargetAccessGetUserTasResponse(
         count=count,
         target_access=user_cache,
+    )
+
+
+@stats.get("/stats/", status_code=status.HTTP_200_OK)
+def get_stats(
+    x_taastatskey: Annotated[str | None, Header()] = None,
+) -> StatsResponse:
+    """Returns stats (on the separate 'stats' service endpoint).
+    If a separate stats header key is defined it must be provided."""
+    # We can only continue if the correct stats key has been provided.
+    if Config.STATS_KEY and x_taastatskey != Config.STATS_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid/missing X_TAAStatsKey",
+        )
+
+    return StatsResponse(
+        kind=_VERSION_KIND,
+        name=_VERSION_NAME,
+        version=_VERSION,
+        stats=yaml.dump(get_stats(), default_flow_style=False),
     )
