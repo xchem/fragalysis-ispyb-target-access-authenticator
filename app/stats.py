@@ -165,7 +165,7 @@ def get_stats() -> dict[str, Any]:
         "user_stats": user_stats,
     }
 
-    stats_response["code_set"] = Config.TAS_CODES_SET
+    stats_response["code_set"] = Config.TAS_CODES_SET or {}
 
     # Done
 
