@@ -42,3 +42,4 @@ jobs:
       uses: docker/build-push-action@v6
       with:
         tags: ${{ env.owner }}/fragalysis-ispyb-target-access-authenticator:latest
+        push: true
