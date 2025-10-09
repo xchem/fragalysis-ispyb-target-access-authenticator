@@ -14,6 +14,7 @@ from fastapi import (
     FastAPI,
     Header,
     HTTPException,
+    Response,
     status,
 )
 from ispyb.exception import ISPyBConnectionException, ISPyBNoResultException
@@ -115,19 +116,6 @@ class TargetAccessGetUserTasResponse(BaseModel):
     count: int
     # Possibly empty set of Target Access strings
     target_access: set[str]
-
-
-class StatsResponse(BaseModel):
-    """/stats/ GET response."""
-
-    # Version information
-    kind: str
-    name: str
-    version: str
-
-    # Basically a string representation
-    # of a Python dictionary of keys and values.
-    stats: str
 
 
 def _get_connector() -> SSHConnector | None:
@@ -451,7 +439,7 @@ def get_taa_user_tas(
 @stats.get("/", status_code=status.HTTP_200_OK)
 def get_stats(
     x_taastatskey: Annotated[str | None, Header()] = None,
-) -> StatsResponse:
+) -> Response:
     """Returns stats (on the separate 'stats' service endpoint).
     If a separate stats header key is defined it must be provided."""
     # We can only continue if the correct stats key has been provided.
@@ -461,9 +449,13 @@ def get_stats(
             detail="Invalid/missing X_TAAStatsKey",
         )
 
-    return StatsResponse(
-        kind=_VERSION_KIND,
-        name=_VERSION_NAME,
-        version=_VERSION,
-        stats=yaml.dump(get_statistics(), default_flow_style=False),
+    # Get the base statistics (a map)
+    data = get_statistics()
+    # And add some extra stuff...
+    data["kind"] = _VERSION_KIND
+    data["name"] = _VERSION_NAME
+    data["version"] = _VERSION
+    return Response(
+        content=yaml.dump(data, default_flow_style=False),
+        media_type="text/plain",
     )

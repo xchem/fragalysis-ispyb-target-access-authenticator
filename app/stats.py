@@ -29,12 +29,18 @@ from app.config import Config
 def get_statistics() -> dict[str, Any]:
     """Returns a detailed collection of stats as a dictionary of keys and values."""
 
-    stats_response: dict[str, Any] = {}
+    # Populates root keys:
+    #
+    # - code_set
+    # - memcached
+    # - ping
+    # - users
 
-    client: RetryingClient = get_memcached_retrying_client()
+    stats_response: dict[str, Any] = {"code_set": list(Config.TAS_CODES_SET)}
 
     # Collect built-in memcached stats
 
+    client: RetryingClient = get_memcached_retrying_client()
     memcached_stats: dict[str, Any] = {}
     stats: dict[str, Any] = client.stats()
     o_stats: OrderedDict = OrderedDict(sorted(stats.items()))
@@ -164,8 +170,6 @@ def get_statistics() -> dict[str, Any]:
         "avg_tas_count": avg_tas,
         "user_stats": user_stats,
     }
-
-    stats_response["code_set"] = list(Config.TAS_CODES_SET)
 
     # Done
 
