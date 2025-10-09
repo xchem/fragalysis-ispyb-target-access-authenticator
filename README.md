@@ -108,6 +108,11 @@ the cache if it required while also printing the results; -
     ./get.py 'dave lister'
     '{"count":3,"target_access":["aa00000-1","aa00000-254","aa00000-2"]}'
 
+### HTTP debug
+If an ingress is deployed an HTTP service can be used to invoke the container's
+statistics endpoint on port `8081.` This is a `text/plain` response replicating
+the behaviour of the in-container stats utility described above.
+
 ## Contributing
 The project uses: -
 
