@@ -3,6 +3,6 @@
 
 import yaml
 
-from app.stats import get_stats
+from app.stats import get_statistics
 
-print(yaml.dump(get_stats(), default_flow_style=False))
+print(yaml.dump(get_statistics(), default_flow_style=False))
