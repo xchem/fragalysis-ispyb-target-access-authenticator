@@ -1,4 +1,5 @@
 # The default base image
+ARG version=0.0.0
 ARG from_image=python:3.12.11-alpine3.22
 FROM ${from_image} AS python-base
 
@@ -11,6 +12,7 @@ ENV PYTHONUNBUFFERED=1
 ENV APP_ROOT=/home/taa
 
 WORKDIR ${APP_ROOT}
+RUN echo ${version} > VERSION
 
 # another stage for poetry installation. this ensures poetry won't end
 # up in final image where it's not needed
@@ -46,7 +48,6 @@ COPY tas.py .
 COPY app/ ./app/
 COPY logging.config .
 COPY docker-entrypoint.sh .
-COPY VERSION .
 
 # Probes...
 COPY probes/*.sh .

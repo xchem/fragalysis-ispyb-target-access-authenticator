@@ -49,3 +49,5 @@ jobs:
       with:
         tags: ${{ env.owner }}/fragalysis-ispyb-target-access-authenticator:${{ github.ref_name }}
         push: true
+        build-args: |
+          version=${{ github.ref_name }}
