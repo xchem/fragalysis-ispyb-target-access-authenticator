@@ -1,7 +1,8 @@
-# The default base image
-ARG version=0.0.0
-ARG from_image=python:3.12.11-alpine3.22
-FROM ${from_image} AS python-base
+ARG FROM_IMAGE=python:3.12.11-alpine3.22
+ARG POETRY_VERSION=1.8.5
+ARG VERSION=0.0.0
+
+FROM ${FROM_IMAGE} AS python-base
 
 # Force the binary layer of the stdout and stderr streams
 # to be unbuffered
@@ -12,12 +13,11 @@ ENV PYTHONUNBUFFERED=1
 ENV APP_ROOT=/home/taa
 
 WORKDIR ${APP_ROOT}
-RUN echo ${version} > VERSION
 
 # another stage for poetry installation. this ensures poetry won't end
 # up in final image where it's not needed
 FROM python-base AS poetry-base
-ARG POETRY_VERSION=1.8.5
+ARG POETRY_VERSION
 
 RUN pip install --no-cache-dir poetry==${POETRY_VERSION}
 
@@ -31,6 +31,7 @@ RUN POETRY_VIRTUALENVS_IN_PROJECT=true poetry install --no-root --only main --no
 # final stage. only copy the venv with installed packages and point
 # paths to it
 FROM python-base AS final
+ARG VERSION
 
 COPY --from=poetry-base /.venv /.venv
 
@@ -39,7 +40,8 @@ ENV PATH=/.venv/bin:$PATH
 
 # Install tools for memcached.
 # This allows us to run 'memdump -s localhost' to display all the keys.
-RUN apk add libmemcached
+RUN apk add libmemcached \
+    && echo ${VERSION} > VERSION
 
 COPY clear.py .
 COPY get.py .
