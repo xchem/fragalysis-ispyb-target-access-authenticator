@@ -83,7 +83,11 @@ excluded from the `end-of-file-fixer` hook).
 
 ## Release / CI
 
-- `.github/workflows/latest.yaml` builds and pushes `:latest` on every branch push.
+- `.github/workflows/latest.yaml` builds and pushes an image on every branch push — `:latest`
+  from the default branch, and `:<branch-name>` from any other branch. The branch name is
+  slugified (`rlespinasse/github-slug-action`) because image tags cannot contain `/`, so
+  `build/upgrade-ispyb-12` publishes `:build-upgrade-ispyb-12`. Note the branch filter is `'**'`,
+  not `'*'` — the latter does not match branch names containing `/`.
 - `.github/workflows/tag.yaml` fires on a git tag, pushes an image tagged with the git tag, and
   passes `VERSION=<tag>` as a build argument — so **the git tag is what `/version/` reports**.
   Tags are semver without a `v` prefix (`1.0.0`).
