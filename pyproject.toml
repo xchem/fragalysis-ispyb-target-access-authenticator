@@ -34,12 +34,6 @@ pre-commit = "^4.2.0"
 pylint = "^3.3.7"
 isort = "^6.0.1"
 black = "^25.1.0"
-pytest = "^8.3.4"
-
-[tool.pytest.ini_options]
-# The app is not an installed package, so add the repository root to the path
-pythonpath = ["."]
-testpaths = ["tests"]
 
 [tool.pylint.'MESSAGES CONTROL']
 disable = "duplicate-code,too-many-boolean-expressions,too-few-public-methods,too-many-arguments,too-many-positional-arguments,missing-function-docstring,missing-module-docstring,missing-class-docstring"
