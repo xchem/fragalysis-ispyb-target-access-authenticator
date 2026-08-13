@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 """Prints the raw ISPyB response for the members of a given target access string.
 
-There is no '/users/' endpoint yet, so (unlike get.py) this does not use the
-local API - it queries ISPyB directly, printing whatever comes back so that we
-can see how to extract user IDs from it.
-
-Both the visit-level and the proposal-level stored procedures are called, as we
-do not yet know whether the deployed ISPyB defines 'retrieve_persons_for_session'.
+Unlike get.py this does not use the local API - it calls the ISPyB
+'retrieve_persons_for_session' stored procedure directly and prints whatever
+comes back, which is the quickest way to see what the database is really
+saying. A failure (at the time of writing our account is not permitted to
+execute the procedure) is printed rather than raised - the '/users/{tas}'
+endpoint turns the same failure into an empty set of users.
 """
 
 import pprint
@@ -90,7 +90,6 @@ try:
         _PROPOSAL_NUMBER,
         _VISIT_NUMBER,
     )
-    call(_CONNECTOR, "retrieve_persons_for_proposal", _CODE, _PROPOSAL_NUMBER)
 finally:
     if _CONNECTOR.server:
         _CONNECTOR.server.stop()

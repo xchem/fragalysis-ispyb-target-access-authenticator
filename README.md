@@ -84,8 +84,15 @@ that are members of it: -
     header value that matches the `TAA_QUERY_KEY` environment value.
 
 A **400** is returned if the value provided is not a target access string, and a
-**503** if the authenticator cannot reach the underlying (ISPyB) service - the
-caller needs to be able to distinguish "no members" from "we do not know".
+**503** if the authenticator cannot reach the underlying (ISPyB) service at all.
+
+An empty set (`{"count": 0, "users": []}`) is returned when the visit has no
+members, when the visit is not known, **and** when the query itself fails - at
+the time of writing our database account is not permitted to execute the
+underlying `retrieve_persons_for_session` procedure. The caller cannot tell
+those cases apart, so a query failure is logged as a warning by the
+authenticator (and is visible with `users.py` in the container).
+
 Unlike the target-access endpoint, results are **not** cached, so every request
 results in a query of the underlying service.
 
@@ -131,11 +138,10 @@ the cache if it required while also printing the results; -
     '{"count":3,"target_access":["aa00000-1","aa00000-254","aa00000-2"]}'
 
 `users.py` goes the other way - given a target access string it prints the
-**raw** ISPyB response for the people who are members of it. There is no
-`/users/` endpoint yet, so this queries ISPyB directly rather than using the
-local API, and it calls both the visit-level and proposal-level stored
-procedures because we do not yet know whether the deployed ISPyB provides
-`retrieve_persons_for_session`: -
+**raw** ISPyB response for the people who are members of it, by calling the
+`retrieve_persons_for_session` stored procedure directly rather than going
+through the local API. Use it to see what the database actually returns, or
+why the call is being refused: -
 
     ./users.py lb12345-1
 

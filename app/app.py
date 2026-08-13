@@ -9,6 +9,7 @@ from typing import Annotated, Any
 from urllib.parse import quote
 
 import ispyb
+import pymysql
 import sshtunnel
 import yaml
 from fastapi import (
@@ -244,8 +245,9 @@ def _get_users_from_remote_ispyb(
     code: str, proposal_number: str, visit_number: str
 ) -> set[str] | None:
     """Gets the users (logins) that are members of a proposal visit.
-    It returns None on error, an empty set if the visit has no members
-    or is not known, or a set of logins.
+    It returns None if ISPyB cannot be reached at all, an empty set if the
+    visit has no members, is not known, or the query itself failed, and
+    otherwise a set of logins.
     """
     ssh_connector: SSHConnector | None = _get_connector()
     if not ssh_connector:
@@ -254,7 +256,7 @@ def _get_users_from_remote_ispyb(
         )
         return None
 
-    rs: list[dict[str, Any]] | None = None
+    rs: list[dict[str, Any]] = []
     try:
         rs = ssh_connector.core.retrieve_persons_for_session(
             code, proposal_number, visit_number
@@ -263,14 +265,23 @@ def _get_users_from_remote_ispyb(
         _LOGGER.debug(
             "ispyb.NoResult for '%s%s-%s'", code, proposal_number, visit_number
         )
-        rs = []
-    # Request done, always stop the server
-    if ssh_connector.server:
-        ssh_connector.server.stop()
-
-    # Anything to process?
-    if rs is None:
-        return None
+    except (pymysql.MySQLError, ispyb.ISPyBException) as ispyb_err:
+        # The query failed - typically because our database account is not
+        # permitted to execute the stored procedure. We treat this as "no
+        # members" (the caller gets an empty set), but it is an operational
+        # problem so it is logged as a warning rather than passed over.
+        _LOGGER.warning(
+            "%s calling retrieve_persons_for_session for '%s%s-%s' (%s)",
+            ispyb_err.__class__.__name__,
+            code,
+            proposal_number,
+            visit_number,
+            ispyb_err,
+        )
+    finally:
+        # Request done, always stop the server
+        if ssh_connector.server:
+            ssh_connector.server.stop()
 
     # Each record is expected to look like this,
     # and it is the 'login' we return: -
