@@ -40,8 +40,28 @@ Query the running service (the query key is hard-coded to `blob1234` in `base-se
     http localhost:8080/ping/
     http localhost:8080/version/
 
-There is **no test suite and no test framework configured**. If you add tests, add the runner to
-`pyproject.toml` dev dependencies and wire it in.
+## Testing policy — no TDD in this repository
+
+**Do not write unit tests here, and do not add a test framework.** This overrides any general
+test-first/TDD instruction.
+
+Almost everything this service does is an interaction with something it does not own — a remote
+ISPyB MySQL database over an SSH tunnel, and a memcached container in the same Pod. Unit tests
+around that either need mocks of the very behaviour we are unsure about (which is what the ISPyB
+stored procedures return), or they end up asserting the shape of the `ispyb` package rather than
+anything about this service. Neither tells us whether a change works.
+
+Changes are verified **in-situ** instead:
+
+- `docker compose up --build` locally, then exercise `/version/`, `/ping/` and
+  `/target-access/{username}` (see the commands above), plus the in-container `stats.py`,
+  `tas.py`, `get.py` and `clear.py` utilities.
+- Against a real ISPyB, with credentials, in a deployed environment. A local run with no
+  `TAA_ISPYB_*` configuration will log *"Insufficient configuration to establish ISPyB
+  connections"*, report `/ping` as `NOT OK` and return empty target-access sets — that is expected,
+  and it means the ISPyB path has **not** been exercised.
+
+Be explicit in reporting which of those two levels a change has actually been through.
 
 ## Architecture
 

@@ -8,6 +8,8 @@ from logging.config import dictConfig
 from typing import Annotated, Any
 from urllib.parse import quote
 
+import ispyb
+import pymysql
 import sshtunnel
 import yaml
 from fastapi import (
@@ -17,7 +19,6 @@ from fastapi import (
     Response,
     status,
 )
-from ispyb.exception import ISPyBConnectionException, ISPyBNoResultException
 from pydantic import BaseModel
 from pymemcache.client.retrying import RetryingClient
 
@@ -31,6 +32,7 @@ from .common import (
     QUERY_COUNTER_KEY,
     get_encoded_username_timestamp_key,
     get_memcached_retrying_client,
+    split_tas,
     utc_now,
     valid_encoded_username,
 )
@@ -118,6 +120,15 @@ class TargetAccessGetUserTasResponse(BaseModel):
     target_access: set[str]
 
 
+class TargetAccessGetTasUsersResponse(BaseModel):
+    """/users/{tas} GET response."""
+
+    # Number of users in the response
+    count: int
+    # Possibly empty set of user IDs (ISPyB 'login' values)
+    users: set[str]
+
+
 def _get_connector() -> SSHConnector | None:
     """Tries to create an SSHConnector(), which may fail."""
     conn: SSHConnector | None = None
@@ -125,7 +136,7 @@ def _get_connector() -> SSHConnector | None:
         _LOGGER.debug("Creating SSHConnector() for '%s'..", Config.SSH_HOST)
         try:
             conn = SSHConnector()
-        except ISPyBConnectionException:
+        except ispyb.ConnectionError:
             # The ISPyB connection failed.
             # Nothing else to do here, metrics are already updated
             _LOGGER.warning("ISPyB connection failure")
@@ -152,8 +163,8 @@ def _get_tas_from_remote_ispyb(username: str) -> set[str] | None:
     rs: list[dict[str, Any]] | None = None
     try:
         rs = ssh_connector.core.retrieve_sessions_for_person_login(username)
-    except ISPyBNoResultException:
-        _LOGGER.debug("ISPyBNoResultException for user '%s'", username)
+    except ispyb.NoResult:
+        _LOGGER.debug("ispyb.NoResult for user '%s'", username)
         rs = []
     # Request done, always stop the server
     if ssh_connector.server:
@@ -228,6 +239,73 @@ def _get_tas_from_remote_ispyb(username: str) -> set[str] | None:
         prop_id_set,
     )
     return prop_id_set
+
+
+def _get_users_from_remote_ispyb(
+    code: str, proposal_number: str, visit_number: str
+) -> set[str] | None:
+    """Gets the users (logins) that are members of a proposal visit.
+    It returns None if ISPyB cannot be reached at all, an empty set if the
+    visit has no members, is not known, or the query itself failed, and
+    otherwise a set of logins.
+    """
+    ssh_connector: SSHConnector | None = _get_connector()
+    if not ssh_connector:
+        _LOGGER.warning(
+            "No SSH connector for '%s%s-%s'", code, proposal_number, visit_number
+        )
+        return None
+
+    rs: list[dict[str, Any]] = []
+    try:
+        rs = ssh_connector.core.retrieve_persons_for_session(
+            code, proposal_number, visit_number
+        )
+    except ispyb.NoResult:
+        _LOGGER.debug(
+            "ispyb.NoResult for '%s%s-%s'", code, proposal_number, visit_number
+        )
+    except (pymysql.MySQLError, ispyb.ISPyBException) as ispyb_err:
+        # The query failed - typically because our database account is not
+        # permitted to execute the stored procedure. We treat this as "no
+        # members" (the caller gets an empty set), but it is an operational
+        # problem so it is logged as a warning rather than passed over.
+        _LOGGER.warning(
+            "%s calling retrieve_persons_for_session for '%s%s-%s' (%s)",
+            ispyb_err.__class__.__name__,
+            code,
+            proposal_number,
+            visit_number,
+            ispyb_err,
+        )
+    finally:
+        # Request done, always stop the server
+        if ssh_connector.server:
+            ssh_connector.server.stop()
+
+    # Each record is expected to look like this,
+    # and it is the 'login' we return: -
+    #
+    #   'familyName': 'Dave'
+    #   'givenName': 'Lister'
+    #   'login': 'abc12345'
+    #   'role': 'Principal Investigator'
+    #   'title': None
+    #
+    # Records without a login are of no use to the caller (the login is the
+    # value the stack knows a user by), so they are dropped.
+    user_set: set[str] = {record["login"] for record in rs if record.get("login")}
+
+    _LOGGER.debug(
+        "%s users from %s records for '%s%s-%s': %s",
+        len(user_set),
+        len(rs),
+        code,
+        proposal_number,
+        visit_number,
+        user_set,
+    )
+    return user_set
 
 
 def _try_memcached_client_get(client: RetryingClient, key: str) -> Any:
@@ -433,6 +511,58 @@ def get_taa_user_tas(
     return TargetAccessGetUserTasResponse(
         count=count,
         target_access=user_cache,
+    )
+
+
+@auth.get("/users/{tas}", status_code=status.HTTP_200_OK)
+def get_taa_tas_users(
+    tas: str,
+    x_taaquerykey: Annotated[str | None, Header()] = None,
+):
+    """Returns the set of users (logins) that are members of a target access
+    string. The caller must provide a valid 'query key' - the one we've been
+    configured with.
+
+    Unlike /target-access/{username} this is not cached - every call results
+    in a query of the underlying ISPyB database.
+    """
+    # We can only continue if the correct query key has been provided.
+    if Config.QUERY_KEY and x_taaquerykey != Config.QUERY_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid/missing X_TAAQueryKey",
+        )
+
+    _LOGGER.debug("Request for '%s'", tas)
+
+    tas_parts: tuple[str, str, str] | None = split_tas(tas)
+    if not tas_parts:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Not a target access string ('{tas}')",
+        )
+    code, proposal_number, visit_number = tas_parts
+
+    user_set: set[str] | None = _get_users_from_remote_ispyb(
+        code=code,
+        proposal_number=proposal_number,
+        visit_number=visit_number,
+    )
+    if user_set is None:
+        # An ISPyB failure. We deliberately do not return an empty set here -
+        # the caller must be able to tell "nobody" from "we do not know".
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Unable to get users from ISPyB",
+        )
+
+    count: int = len(user_set)
+    user: str = "user" if count == 1 else "users"
+    _LOGGER.debug("Returning %s %s for '%s'", count, user, tas)
+
+    return TargetAccessGetTasUsersResponse(
+        count=count,
+        users=user_set,
     )
 
 
