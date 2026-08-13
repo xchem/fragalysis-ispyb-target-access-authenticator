@@ -1,0 +1,100 @@
+#!/usr/bin/env python
+"""Prints the raw ISPyB response for the members of a given target access string.
+
+There is no '/users/' endpoint yet, so (unlike get.py) this does not use the
+local API - it queries ISPyB directly, printing whatever comes back so that we
+can see how to extract user IDs from it.
+
+Both the visit-level and the proposal-level stored procedures are called, as we
+do not yet know whether the deployed ISPyB defines 'retrieve_persons_for_session'.
+"""
+
+import pprint
+import re
+import sys
+from typing import Any, NoReturn
+
+import ispyb
+import sshtunnel
+
+from app.remote_ispyb_connector import SSHConnector
+
+# A target access string, i.e. "lb12345-1" is code "lb",
+# proposal number "12345" and visit number "1"
+_TAS_PATTERN: re.Pattern = re.compile(r"^([a-zA-Z]+)(\d+)-(\d+)$")
+
+
+def error(msg: str) -> NoReturn:
+    """Prints an error and usage, and then gives up."""
+    print(f"ERROR: {msg}")
+    print("Usage: users.py [target-access-string]")
+    sys.exit(1)
+
+
+def call(connector: SSHConnector, name: str, *args: str) -> None:
+    """Calls one of the 'core' retrieval methods, printing the raw response."""
+    print(f"--- {name}{args}")
+    try:
+        response: list[dict[str, Any]] = getattr(connector.core, name)(*args)
+    except ispyb.NoResult:
+        # The connector raises this for an empty result-set.
+        # We cannot tell "no such proposal" from "no members" here.
+        print("ispyb.NoResult (empty result-set)")
+        return
+    except Exception as ex:  # pylint: disable=broad-exception-caught
+        # Typically a missing stored procedure, which is what we are trying
+        # to find out, so report it rather than letting it escape.
+        print(f"{ex.__class__.__name__}: {ex}")
+        return
+
+    print(f"{len(response)} record(s)")
+    pprint.pprint(response)
+    if response:
+        print("Keys:")
+        pprint.pprint(sorted(response[0].keys()))
+
+
+if len(sys.argv) != 2:
+    error("Missing target access string")
+
+_TAS: str = sys.argv[1]
+_MATCH: re.Match | None = _TAS_PATTERN.match(_TAS)
+if not _MATCH:
+    error(
+        f'"{_TAS}" is not a target access string (expected something like "lb12345-1")'
+    )
+
+_CODE, _PROPOSAL_NUMBER, _VISIT_NUMBER = _MATCH.groups()
+print(f"       TAS: '{_TAS}'")
+print(f"      Code: '{_CODE}'")
+print(f"  Proposal: '{_PROPOSAL_NUMBER}'")
+print(f"     Visit: '{_VISIT_NUMBER}'")
+
+# Connect to ISPyB.
+# The connector is created (and stopped) here, just like the app does
+# for each request.
+_CONNECTOR: SSHConnector | None = None
+try:
+    _CONNECTOR = SSHConnector()
+except ispyb.ConnectionError:
+    error("ISPyB connection failure (are the ISPyB credentials correct?)")
+except sshtunnel.BaseSSHTunnelForwarderError:
+    error("Failed to establish an SSH tunnel")
+except ValueError as v_err:
+    # sshtunnel raises this when it has neither a password nor a key file,
+    # i.e. the container has not been given any TAA_SSH_* configuration.
+    error(f"No SSH credentials - is this container configured for ISPyB? ({v_err})")
+
+assert _CONNECTOR
+try:
+    call(
+        _CONNECTOR,
+        "retrieve_persons_for_session",
+        _CODE,
+        _PROPOSAL_NUMBER,
+        _VISIT_NUMBER,
+    )
+    call(_CONNECTOR, "retrieve_persons_for_proposal", _CODE, _PROPOSAL_NUMBER)
+finally:
+    if _CONNECTOR.server:
+        _CONNECTOR.server.stop()

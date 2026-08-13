@@ -47,6 +47,7 @@ COPY clear.py .
 COPY get.py .
 COPY stats.py .
 COPY tas.py .
+COPY users.py .
 COPY app/ ./app/
 COPY logging.config .
 COPY docker-entrypoint.sh .

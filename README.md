@@ -108,6 +108,15 @@ the cache if it required while also printing the results; -
     ./get.py 'dave lister'
     '{"count":3,"target_access":["aa00000-1","aa00000-254","aa00000-2"]}'
 
+`users.py` goes the other way - given a target access string it prints the
+**raw** ISPyB response for the people who are members of it. There is no
+`/users/` endpoint yet, so this queries ISPyB directly rather than using the
+local API, and it calls both the visit-level and proposal-level stored
+procedures because we do not yet know whether the deployed ISPyB provides
+`retrieve_persons_for_session`: -
+
+    ./users.py lb12345-1
+
 ### HTTP debug
 If an **Ingress** is deployed an HTTP service can be used to invoke the container's
 statistics endpoint on port `8081.` This is a `text/plain` response replicating
