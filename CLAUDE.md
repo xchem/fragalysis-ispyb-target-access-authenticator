@@ -15,16 +15,22 @@ behaviour changes.
 
 ## Commands
 
-Set-up (Poetry, Python 3.12):
+Set-up (uv, Python 3.12 — pinned by `.python-version`):
 
-    poetry install --with dev
-    pre-commit install -t commit-msg -t pre-commit
+    uv sync
+    uv run pre-commit install -t commit-msg -t pre-commit
+
+`uv sync` installs the runtime dependencies *and* the `dev` group into `.venv` from `uv.lock`.
+Dependencies live in `[project.dependencies]` / `[dependency-groups]` in `pyproject.toml`; after
+changing one, run `uv lock` and commit `uv.lock`, because the image builds with
+`uv sync --locked`, which fails when the lock and `pyproject.toml` disagree. The project itself is
+not a package (`[tool.uv] package = false`) — the app is run from the source tree as `app.app`.
 
 Lint / format / type-check — everything runs through pre-commit (isort, black, mypy, pylint);
 there is no separate lint script:
 
-    pre-commit run --all-files
-    pre-commit run mypy --all-files      # a single hook
+    uv run pre-commit run --all-files
+    uv run pre-commit run mypy --all-files      # a single hook
 
 Run locally (builds the image and starts memcached alongside it):
 

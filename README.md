@@ -10,7 +10,7 @@
 [![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg)](https://conventionalcommits.org)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![Packaged with Poetry](https://img.shields.io/badge/packaging-poetry-cyan.svg)](https://python-poetry.org/)
+[![Packaged with uv](https://img.shields.io/badge/packaging-uv-cyan.svg)](https://docs.astral.sh/uv/)
 
 The ISPyB authenticator provides the Fragalysis Stack with a centralised service that
 can be utilised by any number of stacks, and yields Target Access Strings based on User.
@@ -168,7 +168,7 @@ The project uses: -
   upstream repository
 - [Commitizen] to enforce a [Conventional Commit] commit message format
 - [Black] as a code formatter
-- [Poetry] as a package manager (for the b/e)
+- [uv] as a package manager (for the b/e)
 
 You **MUST** comply with these choices in order to  contribute to the project.
 
@@ -176,14 +176,23 @@ To get started review the pre-commit utility and the conventional commit style
 and then set-up your local clone by following the **Installation** and
 **Quick Start** sections: -
 
-    poetry shell
-    poetry install --with dev
-    pre-commit install -t commit-msg -t pre-commit
+    uv sync
+    uv run pre-commit install -t commit-msg -t pre-commit
 
 Now the project's rules will run on every commit, and you can check the
 current health of your clone with: -
 
-    pre-commit run --all-files
+    uv run pre-commit run --all-files
+
+`uv sync` creates a `.venv` in the clone, installing the project's dependencies
+and the development group from the `uv.lock` file. Prefix commands with
+`uv run` to use it, or activate it yourself with `source .venv/bin/activate`.
+The Python version is pinned by the `.python-version` file, and matches the
+version used by the container image.
+
+If you change a dependency in `pyproject.toml` run `uv lock` and commit the
+updated `uv.lock` - the image build uses `uv sync --locked`, which fails if the
+two are out of step.
 
 ## Local development
 There's a `docker-compose.yml` file to deploy the authenticator and memcached.
@@ -248,6 +257,6 @@ See: -
 [fastapi]: https://fastapi.tiangolo.com
 [fragalysis-backend]: https://github.com/xchem/fragalysis-backend
 [httpie]: https://httpie.io
-[poetry]: https://python-poetry.org
+[uv]: https://docs.astral.sh/uv
 [pre-commit]: https://pre-commit.com
 [shortuuid]: https://pypi.org/project/shortuuid/
