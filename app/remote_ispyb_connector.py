@@ -5,16 +5,12 @@ import threading
 import time
 import traceback
 
+import ispyb
 import pymysql
 import sshtunnel
 from ispyb.connector.mysqlsp.main import ISPyBMySQLSPConnector as Connector
-from ispyb.exception import (
-    ISPyBConnectionException,
-    ISPyBNoResultException,
-    ISPyBRetrieveFailed,
-)
 from pymysql import Connection
-from pymysql.cursors import Cursor
+from pymysql.cursors import Cursor, DictCursor
 from pymysql.err import OperationalError
 
 from .config import Config
@@ -35,9 +31,21 @@ PYMYSQL_EXCEPTION_RECONNECT_DELAY_S = 1
 
 
 class SSHConnector(Connector):
-    """An SSH connector"""
+    """An SSH connector.
 
-    def __init__(self):
+    We deliberately do not use the parent's connection handling - it connects
+    directly with mysql.connector and knows nothing about our SSH tunnel.
+    We build our own pymysql connection in remote_connect() instead, which is
+    why the parent's __init__() is not called and its abstract '_notimplemented'
+    is left alone.
+    """
+
+    # 'abstract-method' - the parent's '_notimplemented' is not on our path.
+    # 'unsubscriptable-object' - pymysql's Connection is only subscriptable
+    # to a type-checker, and the annotation is never evaluated at runtime.
+    # pylint: disable=abstract-method,unsubscriptable-object
+
+    def __init__(self):  # pylint: disable=super-init-not-called
         self.conn_inactivity = Config.ISPYB_CONN_INACTIVITY
         self.lock: threading.Lock = threading.Lock()
         self.conn: Connection[Cursor] | None = None
@@ -172,35 +180,43 @@ class SSHConnector(Connector):
                 logger.warning("Failed to connect")
             PrometheusMetrics.failed_ispyb_connection()
             self.server.stop()
-            raise ISPyBConnectionException
+            raise ispyb.ConnectionError
         self.last_activity_ts = time.time()
 
-    def create_cursor(self):
-        """Create a server/db cursor"""
+    def create_cursor(self, dictionary=False):
+        """Create a server/db cursor.
+        The parent class calls this with 'dictionary=True' when it needs rows
+        returned as dictionaries rather than tuples.
+        """
         if (
             not self.last_activity_ts
             or time.time() - self.last_activity_ts > self.conn_inactivity
         ):
-            # re-connect:
-            self.connect(self.user, self.pw, self.host, self.db, self.port)
+            # The connection has been stopped, or left idle for too long.
+            # We cannot re-connect here - the parent's connect() knows nothing
+            # about our SSH tunnel - so the caller has to create a new connector.
+            logger.debug("Connection is not usable (stopped or idle too long)")
+            raise ispyb.ConnectionError
         self.last_activity_ts = time.time()
         if self.conn is None:
-            raise ISPyBConnectionException
+            raise ispyb.ConnectionError
 
-        cursor = self.conn.cursor(pymysql.cursors.DictCursor)
+        cursor = self.conn.cursor(DictCursor if dictionary else Cursor)
         if cursor is None:
-            raise ISPyBConnectionException
+            raise ispyb.ConnectionError
         return cursor
 
     def call_sp_retrieve(self, procname, args):
         """Retrieve server results"""
         assert self.conn
         with self.lock:
-            cursor = self.create_cursor()
+            # Rows are returned as dictionaries (keyed on column name),
+            # which is what the callers of the 'core' methods expect.
+            cursor = self.create_cursor(dictionary=True)
             try:
                 cursor.callproc(procname=procname, args=args)
             except self.conn.DataError as e:
-                raise ISPyBRetrieveFailed(
+                raise ispyb.ReadWriteError(
                     f"DataError({e}): {traceback.format_exc()}"
                 ) from e
 
@@ -208,7 +224,7 @@ class SSHConnector(Connector):
 
             cursor.close()
         if result == []:
-            raise ISPyBNoResultException
+            raise ispyb.NoResult
         return result
 
     def stop(self):

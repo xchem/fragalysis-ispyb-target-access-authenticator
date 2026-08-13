@@ -8,6 +8,7 @@ from logging.config import dictConfig
 from typing import Annotated, Any
 from urllib.parse import quote
 
+import ispyb
 import sshtunnel
 import yaml
 from fastapi import (
@@ -17,7 +18,6 @@ from fastapi import (
     Response,
     status,
 )
-from ispyb.exception import ISPyBConnectionException, ISPyBNoResultException
 from pydantic import BaseModel
 from pymemcache.client.retrying import RetryingClient
 
@@ -125,7 +125,7 @@ def _get_connector() -> SSHConnector | None:
         _LOGGER.debug("Creating SSHConnector() for '%s'..", Config.SSH_HOST)
         try:
             conn = SSHConnector()
-        except ISPyBConnectionException:
+        except ispyb.ConnectionError:
             # The ISPyB connection failed.
             # Nothing else to do here, metrics are already updated
             _LOGGER.warning("ISPyB connection failure")
@@ -152,8 +152,8 @@ def _get_tas_from_remote_ispyb(username: str) -> set[str] | None:
     rs: list[dict[str, Any]] | None = None
     try:
         rs = ssh_connector.core.retrieve_sessions_for_person_login(username)
-    except ISPyBNoResultException:
-        _LOGGER.debug("ISPyBNoResultException for user '%s'", username)
+    except ispyb.NoResult:
+        _LOGGER.debug("ispyb.NoResult for user '%s'", username)
         rs = []
     # Request done, always stop the server
     if ssh_connector.server:

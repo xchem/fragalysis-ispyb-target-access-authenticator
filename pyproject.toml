@@ -12,11 +12,10 @@ fastapi = "0.115.8"
 uvicorn = {extras = ["standard"], version = "^0.34.0"}
 # Must avoid paramiko 4.0 (pulled in by others)
 paramiko = "^3.5.1"
-# We're stuck on ISPyB 4.x to avoid the error: -
-#   ImportError: cannot import name 'ISPyBNoResultException' from 'ispyb.connector.mysqlsp.main'
-ispyb = "4.13.2"
-# ispyb (4.13.2) depends on mysql-connector (<2.2.3)
-mysql-connector = "2.1.7"
+# ISPyB 12.x provides 'retrieve_persons_for_session()' (the visit-level membership
+# query) and brings its own modern 'mysql-connector-python' driver.
+# Its exceptions live in the root 'ispyb' module, not 'ispyb.exception'.
+ispyb = "12.1.1"
 # Flexible versions
 humanize = "^4.12.3"
 prometheus-client = "^0.22.1"
@@ -35,6 +34,12 @@ pre-commit = "^4.2.0"
 pylint = "^3.3.7"
 isort = "^6.0.1"
 black = "^25.1.0"
+pytest = "^8.3.4"
+
+[tool.pytest.ini_options]
+# The app is not an installed package, so add the repository root to the path
+pythonpath = ["."]
+testpaths = ["tests"]
 
 [tool.pylint.'MESSAGES CONTROL']
 disable = "duplicate-code,too-many-boolean-expressions,too-few-public-methods,too-many-arguments,too-many-positional-arguments,missing-function-docstring,missing-module-docstring,missing-class-docstring"
