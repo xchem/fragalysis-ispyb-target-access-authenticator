@@ -10,18 +10,14 @@ do not yet know whether the deployed ISPyB defines 'retrieve_persons_for_session
 """
 
 import pprint
-import re
 import sys
 from typing import Any, NoReturn
 
 import ispyb
 import sshtunnel
 
+from app.common import split_tas
 from app.remote_ispyb_connector import SSHConnector
-
-# A target access string, i.e. "lb12345-1" is code "lb",
-# proposal number "12345" and visit number "1"
-_TAS_PATTERN: re.Pattern = re.compile(r"^([a-zA-Z]+)(\d+)-(\d+)$")
 
 
 def error(msg: str) -> NoReturn:
@@ -58,13 +54,13 @@ if len(sys.argv) != 2:
     error("Missing target access string")
 
 _TAS: str = sys.argv[1]
-_MATCH: re.Match | None = _TAS_PATTERN.match(_TAS)
-if not _MATCH:
+_TAS_PARTS: tuple[str, str, str] | None = split_tas(_TAS)
+if not _TAS_PARTS:
     error(
         f'"{_TAS}" is not a target access string (expected something like "lb12345-1")'
     )
 
-_CODE, _PROPOSAL_NUMBER, _VISIT_NUMBER = _MATCH.groups()
+_CODE, _PROPOSAL_NUMBER, _VISIT_NUMBER = _TAS_PARTS
 print(f"       TAS: '{_TAS}'")
 print(f"      Code: '{_CODE}'")
 print(f"  Proposal: '{_PROPOSAL_NUMBER}'")

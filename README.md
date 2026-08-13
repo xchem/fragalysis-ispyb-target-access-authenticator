@@ -67,6 +67,28 @@ The response should be a **200** and a **4XX** for errors: -
     This proves a crude but effective protection mechanism that prevents queries from
     clients that have not been supplied with the query key.
 
+### `/users/{tas}` **[GET]**
+
+The reverse of the target access query. Given a target access string the
+authenticator returns a count and the **set** of user IDs (ISPyB `login` values)
+that are members of it: -
+
+```json
+{
+  "count": 1,
+  "users": [ "abc12345" ]
+}
+```
+
+>   As with the target-access endpoint the client must provide a `X_TAAQueryKey`
+    header value that matches the `TAA_QUERY_KEY` environment value.
+
+A **400** is returned if the value provided is not a target access string, and a
+**503** if the authenticator cannot reach the underlying (ISPyB) service - the
+caller needs to be able to distinguish "no members" from "we do not know".
+Unlike the target-access endpoint, results are **not** cached, so every request
+results in a query of the underlying service.
+
 ### `/ping` **[GET]**
 
 ```json
