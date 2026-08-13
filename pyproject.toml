@@ -1,43 +1,45 @@
-[tool.poetry]
+[project]
 name = "fragalysis-ispyb-target-access-authenticator"
 version = "0.1.0"
-package-mode = false
 description = "The Fragalysis Stack Python/FastAPI ISPyB Target Access Authenticator"
-authors = ["Alan Christie <achristie@einformaticsmatters.com>"]
+authors = [{ name = "Alan Christie", email = "achristie@einformaticsmatters.com" }]
 readme = "README.md"
+requires-python = ">=3.12,<4"
+dependencies = [
+    # Locked versions (for now)
+    "fastapi==0.115.8",
+    "uvicorn[standard]>=0.34.0,<0.35.0",
+    # Must avoid paramiko 4.0 (pulled in by others)
+    "paramiko>=3.5.1,<4",
+    # ISPyB 12.x provides 'retrieve_persons_for_session()' (the visit-level membership
+    # query) and brings its own modern 'mysql-connector-python' driver.
+    # Its exceptions live in the root 'ispyb' module, not 'ispyb.exception'.
+    "ispyb==12.1.1",
+    # Flexible versions
+    "humanize>=4.12.3,<5",
+    "prometheus-client>=0.22.1,<0.23",
+    "pymemcache>=4.0.0,<5",
+    "pydantic>=2.10.6,<3",
+    "pymysql>=1.1.1,<2",
+    "python-dateutil>=2.9.0,<3",
+    "pyyaml>=6.0.3,<7",
+    "requests>=2.32.4,<3",
+    "sshtunnel>=0.4.0,<0.5",
+]
 
-[tool.poetry.dependencies]
-# Locked versions (for now)
-fastapi = "0.115.8"
-uvicorn = {extras = ["standard"], version = "^0.34.0"}
-# Must avoid paramiko 4.0 (pulled in by others)
-paramiko = "^3.5.1"
-# ISPyB 12.x provides 'retrieve_persons_for_session()' (the visit-level membership
-# query) and brings its own modern 'mysql-connector-python' driver.
-# Its exceptions live in the root 'ispyb' module, not 'ispyb.exception'.
-ispyb = "12.1.1"
-# Flexible versions
-humanize = "^4.12.3"
-prometheus-client = "^0.22.1"
-pymemcache = "^4.0.0"
-pydantic = "^2.10.6"
-pymysql = "^1.1.1"
-python = "^3.12"
-python-dateutil = "^2.9.0"
-pyyaml = "^6.0.3"
-requests = "^2.32.4"
-sshtunnel = "^0.4.0"
+[dependency-groups]
+dev = [
+    "httpie>=3.2.4,<4",
+    "pre-commit>=4.2.0,<5",
+    "pylint>=3.3.7,<4",
+    "isort>=6.0.1,<7",
+    "black>=25.1.0,<26",
+]
 
-[tool.poetry.group.dev.dependencies]
-httpie = "^3.2.4"
-pre-commit = "^4.2.0"
-pylint = "^3.3.7"
-isort = "^6.0.1"
-black = "^25.1.0"
+[tool.uv]
+# The app runs from the source tree (as 'app.app'), it is not built or
+# installed as a package - uv only manages its dependencies.
+package = false
 
 [tool.pylint.'MESSAGES CONTROL']
 disable = "duplicate-code,too-many-boolean-expressions,too-few-public-methods,too-many-arguments,too-many-positional-arguments,missing-function-docstring,missing-module-docstring,missing-class-docstring"
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"

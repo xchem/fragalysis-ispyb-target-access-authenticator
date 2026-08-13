@@ -1,0 +1,9 @@
+# uv creates the virtual environment in the clone, and there is no reason to
+# send it (or anything else below) to the docker daemon as build context.
+.venv
+.git
+.github
+.mypy_cache
+__pycache__
+# Never send the local environment file - it holds ISPyB credentials
+.env

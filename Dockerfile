@@ -1,5 +1,5 @@
 ARG FROM_IMAGE=python:3.12.11-alpine3.22
-ARG POETRY_VERSION=1.8.5
+ARG UV_VERSION=0.11.21
 ARG VERSION=0.0.0
 
 FROM ${FROM_IMAGE} AS python-base
@@ -14,26 +14,30 @@ ENV APP_ROOT=/home/taa
 
 WORKDIR ${APP_ROOT}
 
-# another stage for poetry installation. this ensures poetry won't end
+# another stage for uv installation. this ensures uv won't end
 # up in final image where it's not needed
-FROM python-base AS poetry-base
-ARG POETRY_VERSION
+FROM python-base AS uv-base
+ARG UV_VERSION
 
-RUN pip install --no-cache-dir poetry==${POETRY_VERSION}
+RUN pip install --no-cache-dir uv==${UV_VERSION}
 
 WORKDIR /
-COPY poetry.lock pyproject.toml /
+COPY uv.lock pyproject.toml /
 
-# POETRY_VIRTUALENVS_IN_PROJECT tells poetry to create the venv to
-# project's directory (.venv). This way the location is predictable
-RUN POETRY_VIRTUALENVS_IN_PROJECT=true poetry install --no-root --only main --no-directory
+# uv creates the venv in the working directory (.venv), so the location
+# is predictable. '--locked' fails the build if uv.lock is out of step with
+# pyproject.toml, and '--no-dev' leaves the dev group out of the image.
+# UV_PYTHON_DOWNLOADS=never keeps uv on the image's own interpreter rather
+# than fetching one of its own (the base image decides the Python version).
+ENV UV_PYTHON_DOWNLOADS=never
+RUN uv sync --locked --no-dev
 
 # final stage. only copy the venv with installed packages and point
 # paths to it
 FROM python-base AS final
 ARG VERSION
 
-COPY --from=poetry-base /.venv /.venv
+COPY --from=uv-base /.venv /.venv
 
 ENV PYTHONPATH="/.venv/lib/python3.12/site-packages/"
 ENV PATH=/.venv/bin:$PATH
