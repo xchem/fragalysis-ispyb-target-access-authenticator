@@ -47,7 +47,11 @@ jobs:
       uses: docker/setup-qemu-action@v3
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
+    # Workflows triggered by Dependabot do not get the repository's Actions secrets,
+    # so Dependabot branches skip the DockerHub login, the upload and the push.
+    # They are still built and scanned (the gate), which is what their PRs need.
     - name: Login to DockerHub
+      if: github.actor != 'dependabot[bot]'
       uses: docker/login-action@v4
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -87,6 +91,7 @@ jobs:
         format: sarif
         output: trivy-results.sarif
     - name: Upload scan results
+      if: github.actor != 'dependabot[bot]'
       uses: github/codeql-action/upload-sarif@v4
       with:
         sarif_file: trivy-results.sarif
@@ -103,6 +108,7 @@ jobs:
         ignore-unfixed: true
         exit-code: 1
     - name: Push
+      if: github.actor != 'dependabot[bot]'
       uses: docker/build-push-action@v6
       with:
         tags: ${{ env.owner }}/fragalysis-ispyb-target-access-authenticator:${{ env.image_tag }}

@@ -121,7 +121,8 @@ excluded from the `end-of-file-fixer` hook).
   CRITICAL or HIGH vulnerabilities *with a fix available* — so a newly published CVE in the base
   image or a dependency can stop a build that changed nothing. `latest.yaml` also uploads the
   full scan to the repository's Security tab (code scanning does not accept tag refs, so
-  `tag.yaml` does not). Reproduce locally with
+  `tag.yaml` does not). Dependabot branches get no Actions secrets, so they are built and
+  gated but skip the DockerHub login, the upload and the push. Reproduce locally with
   `trivy image --scanners vuln --severity CRITICAL,HIGH --ignore-unfixed <image>`.
 - `.github/dependabot.yml` opens weekly version-update PRs for `uv`, `docker` and
   `github-actions`.
