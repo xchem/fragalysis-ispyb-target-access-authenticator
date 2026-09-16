@@ -27,7 +27,9 @@ changing one, run `uv lock` and commit `uv.lock`, because the image builds with
 not a package (`[tool.uv] package = false`) — the app is run from the source tree as `app.app`.
 
 Lint / format / type-check — everything runs through pre-commit (isort, black, mypy, pylint);
-there is no separate lint script:
+there is no separate lint script. Those tools are **not** in the `dev` group: pre-commit installs
+them into its own environments at the `rev` pinned in `.pre-commit-config.yaml`, which is the one
+place their versions are set. Upgrade them with `uv run pre-commit autoupdate`, not `uv add`.
 
     uv run pre-commit run --all-files
     uv run pre-commit run mypy --all-files      # a single hook
