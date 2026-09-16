@@ -34,6 +34,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # To upload the image scan results to the repository's Security tab
+      security-events: write
     steps:
     - name: Inject slug/short variables
       uses: rlespinasse/github-slug-action@v5
@@ -66,7 +70,39 @@ jobs:
       env:
         REF_NAME: '${{ github.ref_name }}'
         DEFAULT_BRANCH: "${{ github.event.repository.default_branch || 'main' }}"
-    - name: Build and push
+    # Build the image locally first so it can be scanned before it is pushed.
+    # The push (below) re-uses the build cache, so the image is not built twice.
+    - name: Build
+      uses: docker/build-push-action@v6
+      with:
+        tags: ${{ env.owner }}/fragalysis-ispyb-target-access-authenticator:${{ env.image_tag }}
+        load: true
+    # Report every vulnerability in the image to the Security tab...
+    - name: Scan image (report)
+      # Pinned to a commit (v0.36.0), not a tag, as tags can be moved
+      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+      with:
+        image-ref: ${{ env.owner }}/fragalysis-ispyb-target-access-authenticator:${{ env.image_tag }}
+        scanners: vuln
+        format: sarif
+        output: trivy-results.sarif
+    - name: Upload scan results
+      uses: github/codeql-action/upload-sarif@v4
+      with:
+        sarif_file: trivy-results.sarif
+        category: trivy-image
+    # ...but only refuse to push the image for CRITICAL or HIGH
+    # vulnerabilities that have a fix available.
+    - name: Scan image (gate)
+      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+      with:
+        image-ref: ${{ env.owner }}/fragalysis-ispyb-target-access-authenticator:${{ env.image_tag }}
+        scanners: vuln
+        format: table
+        severity: CRITICAL,HIGH
+        ignore-unfixed: true
+        exit-code: 1
+    - name: Push
       uses: docker/build-push-action@v6
       with:
         tags: ${{ env.owner }}/fragalysis-ispyb-target-access-authenticator:${{ env.image_tag }}
