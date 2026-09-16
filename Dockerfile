@@ -1,4 +1,4 @@
-ARG FROM_IMAGE=python:3.12.11-alpine3.22
+ARG FROM_IMAGE=python:3.12.13-alpine3.22
 ARG UV_VERSION=0.11.21
 ARG VERSION=0.0.0
 
@@ -42,9 +42,11 @@ COPY --from=uv-base /.venv /.venv
 ENV PYTHONPATH="/.venv/lib/python3.12/site-packages/"
 ENV PATH=/.venv/bin:$PATH
 
+# Upgrade the OS packages - the base image can lag behind Alpine's security fixes.
 # Install tools for memcached.
 # This allows us to run 'memdump -s localhost' to display all the keys.
-RUN apk add libmemcached \
+RUN apk upgrade --no-cache \
+    && apk add --no-cache libmemcached \
     && echo ${VERSION} > VERSION
 
 COPY clear.py .

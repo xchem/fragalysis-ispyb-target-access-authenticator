@@ -7,7 +7,7 @@ readme = "README.md"
 requires-python = ">=3.12,<4"
 dependencies = [
     # Locked versions (for now)
-    "fastapi==0.115.8",
+    "fastapi==0.141.1",
     "uvicorn[standard]>=0.34.0,<0.35.0",
     # Must avoid paramiko 4.0 (pulled in by others)
     "paramiko>=3.5.1,<4",
