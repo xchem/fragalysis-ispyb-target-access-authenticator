@@ -28,12 +28,11 @@ dependencies = [
 ]
 
 [dependency-groups]
+# isort, black, mypy and pylint are deliberately absent -
+# pre-commit installs and pins them (see '.pre-commit-config.yaml').
 dev = [
     "httpie>=3.2.4,<4",
     "pre-commit>=4.2.0,<5",
-    "pylint>=3.3.7,<5",
-    "isort>=6.0.1,<7",
-    "black>=25.1.0,<26",
 ]
 
 [tool.uv]
