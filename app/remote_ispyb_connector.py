@@ -63,7 +63,15 @@ class SSHConnector(Connector):
             "db_pass": Config.ISPYB_PASSWORD,
             "db_name": Config.ISPYB_DB,
         }
-        logger.debug("Creating remote connector: %s", creds)
+        # Never log 'creds' itself - it contains the SSH and database passwords
+        logger.debug(
+            "Creating remote connector ssh_host=%s ssh_user=%s db_host=%s db_port=%s db_name=%s",
+            Config.SSH_HOST,
+            Config.SSH_USER,
+            Config.ISPYB_HOST,
+            Config.ISPYB_PORT,
+            Config.ISPYB_DB,
+        )
         self.remote_connect(**creds)
         assert self.server
         logger.debug(

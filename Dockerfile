@@ -45,8 +45,12 @@ ENV PATH=/.venv/bin:$PATH
 # Upgrade the OS packages - the base image can lag behind Alpine's security fixes.
 # Install tools for memcached.
 # This allows us to run 'memdump -s localhost' to display all the keys.
+# The base image's pip is removed - nothing uses it at runtime (the app's packages
+# come from the uv-built venv) and it only adds vulnerabilities to the image.
+# It is uninstalled with the base interpreter, as 'python' on the PATH is the venv's.
 RUN apk upgrade --no-cache \
     && apk add --no-cache libmemcached \
+    && /usr/local/bin/python -m pip uninstall --yes pip \
     && echo ${VERSION} > VERSION
 
 COPY clear.py .
