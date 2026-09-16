@@ -1,0 +1,33 @@
+---
+# Dependabot version updates.
+# Security updates (for vulnerable dependencies) are enabled separately,
+# in the repository's 'Settings -> Code security'.
+#
+# Commit messages use a Conventional Commits prefix, i.e. 'build(deps): ...'
+
+version: 2
+
+updates:
+- package-ecosystem: uv
+  directory: /
+  schedule:
+    interval: weekly
+  commit-message:
+    prefix: build
+    include: scope
+
+- package-ecosystem: docker
+  directory: /
+  schedule:
+    interval: weekly
+  commit-message:
+    prefix: build
+    include: scope
+
+- package-ecosystem: github-actions
+  directory: /
+  schedule:
+    interval: weekly
+  commit-message:
+    prefix: ci
+    include: scope

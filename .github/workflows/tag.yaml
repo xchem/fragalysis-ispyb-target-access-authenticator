@@ -46,7 +46,29 @@ jobs:
         run: echo "version=${VERSION}" >> "$GITHUB_ENV"
         env:
           VERSION: "${{ github.ref_name }}"
-      - name: Build and Push (Tag)
+      # Build the image locally first so it can be scanned before it is pushed.
+      # The push (below) re-uses the build cache, so the image is not built twice.
+      - name: Build (Tag)
+        uses: docker/build-push-action@v6
+        with:
+          tags: ${{ env.owner }}/fragalysis-ispyb-target-access-authenticator:${{ github.ref_name }}
+          load: true
+          build-args: |
+            VERSION=${{ env.version }}
+      # Refuse to release an image with CRITICAL or HIGH vulnerabilities
+      # that have a fix available. Results are not uploaded to the Security tab
+      # (code scanning does not accept tag refs) - the 'latest' workflow does that.
+      - name: Scan image
+        # Pinned to a commit (v0.36.0), not a tag, as tags can be moved
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          image-ref: ${{ env.owner }}/fragalysis-ispyb-target-access-authenticator:${{ github.ref_name }}
+          scanners: vuln
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: 1
+      - name: Push (Tag)
         uses: docker/build-push-action@v6
         with:
           tags: ${{ env.owner }}/fragalysis-ispyb-target-access-authenticator:${{ github.ref_name }}

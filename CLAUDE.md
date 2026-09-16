@@ -117,6 +117,14 @@ excluded from the `end-of-file-fixer` hook).
 - `.github/workflows/tag.yaml` fires on a git tag, pushes an image tagged with the git tag, and
   passes `VERSION=<tag>` as a build argument — so **the git tag is what `/version/` reports**.
   Tags are semver without a `v` prefix (`1.0.0`).
+- Both workflows build the image locally, scan it with Trivy, and only push if there are no
+  CRITICAL or HIGH vulnerabilities *with a fix available* — so a newly published CVE in the base
+  image or a dependency can stop a build that changed nothing. `latest.yaml` also uploads the
+  full scan to the repository's Security tab (code scanning does not accept tag refs, so
+  `tag.yaml` does not). Reproduce locally with
+  `trivy image --scanners vuln --severity CRITICAL,HIGH --ignore-unfixed <image>`.
+- `.github/dependabot.yml` opens weekly version-update PRs for `uv`, `docker` and
+  `github-actions`.
 
 ## Conventions
 
