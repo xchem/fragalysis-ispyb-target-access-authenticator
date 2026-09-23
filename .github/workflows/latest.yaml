@@ -46,7 +46,7 @@ jobs:
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v3
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@v4
     # Workflows triggered by Dependabot do not get the repository's Actions secrets,
     # so Dependabot branches skip the DockerHub login, the upload and the push.
     # They are still built and scanned (the gate), which is what their PRs need.
