@@ -51,7 +51,7 @@ jobs:
       # Build the image locally first so it can be scanned before it is pushed.
       # The push (below) re-uses the build cache, so the image is not built twice.
       - name: Build (Tag)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           tags: ${{ env.owner }}/fragalysis-ispyb-target-access-authenticator:${{ github.ref_name }}
           load: true
@@ -71,7 +71,7 @@ jobs:
           ignore-unfixed: true
           exit-code: 1
       - name: Push (Tag)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           tags: ${{ env.owner }}/fragalysis-ispyb-target-access-authenticator:${{ github.ref_name }}
           push: true
