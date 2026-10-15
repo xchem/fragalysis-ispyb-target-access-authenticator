@@ -70,15 +70,23 @@ The response should be a **200** and a **4XX** for errors: -
 ### `/users/{tas}` **[GET]**
 
 The reverse of the target access query. Given a target access string the
-authenticator returns a count and the **set** of user IDs (ISPyB `login` values)
-that are members of it: -
+authenticator returns a count, the **set** of user IDs (ISPyB `login` values)
+that are members of it, and (from **1.6.0**) the same users as a list of
+`members` (sorted by `login`) with the given and family names ISPyB holds for
+them. A name is `null` if ISPyB has none: -
 
 ```json
 {
   "count": 1,
-  "users": [ "abc12345" ]
+  "users": [ "abc12345" ],
+  "members": [
+    { "login": "abc12345", "given_name": "Dave", "family_name": "Lister" }
+  ]
 }
 ```
+
+`users` is retained so that clients written before `members` was added continue
+to work.
 
 >   As with the target-access endpoint the client must provide a `X_TAAQueryKey`
     header value that matches the `TAA_QUERY_KEY` environment value.
@@ -86,7 +94,7 @@ that are members of it: -
 A **400** is returned if the value provided is not a target access string, and a
 **503** if the authenticator cannot reach the underlying (ISPyB) service at all.
 
-An empty set (`{"count": 0, "users": []}`) is returned when the visit has no
+An empty set (`{"count": 0, "users": [], "members": []}`) is returned when the visit has no
 members, when the visit is not known, **and** when the query itself fails - at
 the time of writing our database account is not permitted to execute the
 underlying `retrieve_persons_for_session` procedure. The caller cannot tell

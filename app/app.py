@@ -120,6 +120,17 @@ class TargetAccessGetUserTasResponse(BaseModel):
     target_access: set[str]
 
 
+class TargetAccessTasMember(BaseModel):
+    """A member of a target access string. The names are those ISPyB holds
+    for the user, and are None if ISPyB has none.
+    """
+
+    # The user ID (ISPyB 'login' value)
+    login: str
+    given_name: str | None
+    family_name: str | None
+
+
 class TargetAccessGetTasUsersResponse(BaseModel):
     """/users/{tas} GET response."""
 
@@ -127,6 +138,9 @@ class TargetAccessGetTasUsersResponse(BaseModel):
     count: int
     # Possibly empty set of user IDs (ISPyB 'login' values)
     users: set[str]
+    # The same users, with their names, sorted by login (added in 1.6.0).
+    # 'users' is retained so that older clients continue to work.
+    members: list[TargetAccessTasMember]
 
 
 def _get_connector() -> SSHConnector | None:
@@ -243,11 +257,11 @@ def _get_tas_from_remote_ispyb(username: str) -> set[str] | None:
 
 def _get_users_from_remote_ispyb(
     code: str, proposal_number: str, visit_number: str
-) -> set[str] | None:
-    """Gets the users (logins) that are members of a proposal visit.
-    It returns None if ISPyB cannot be reached at all, an empty set if the
+) -> list[TargetAccessTasMember] | None:
+    """Gets the users that are members of a proposal visit.
+    It returns None if ISPyB cannot be reached at all, an empty list if the
     visit has no members, is not known, or the query itself failed, and
-    otherwise a set of logins.
+    otherwise a list of members (one per login), sorted by login.
     """
     ssh_connector: SSHConnector | None = _get_connector()
     if not ssh_connector:
@@ -284,28 +298,38 @@ def _get_users_from_remote_ispyb(
             ssh_connector.server.stop()
 
     # Each record is expected to look like this,
-    # and it is the 'login' we return: -
+    # and it is the 'login' and names we return: -
     #
-    #   'familyName': 'Dave'
-    #   'givenName': 'Lister'
+    #   'familyName': 'Lister'
+    #   'givenName': 'Dave'
     #   'login': 'abc12345'
     #   'role': 'Principal Investigator'
     #   'title': None
     #
     # Records without a login are of no use to the caller (the login is the
-    # value the stack knows a user by), so they are dropped.
-    user_set: set[str] = {record["login"] for record in rs if record.get("login")}
+    # value the stack knows a user by), so they are dropped. A person can
+    # appear more than once (e.g. with different roles), so we keep the first
+    # record for each login.
+    members: dict[str, TargetAccessTasMember] = {}
+    for record in rs:
+        login: str | None = record.get("login")
+        if login and login not in members:
+            members[login] = TargetAccessTasMember(
+                login=login,
+                given_name=record.get("givenName"),
+                family_name=record.get("familyName"),
+            )
 
     _LOGGER.debug(
         "%s users from %s records for '%s%s-%s': %s",
-        len(user_set),
+        len(members),
         len(rs),
         code,
         proposal_number,
         visit_number,
-        user_set,
+        sorted(members),
     )
-    return user_set
+    return [members[login] for login in sorted(members)]
 
 
 def _try_memcached_client_get(client: RetryingClient, key: str) -> Any:
@@ -519,8 +543,9 @@ def get_taa_tas_users(
     tas: str,
     x_taaquerykey: Annotated[str | None, Header()] = None,
 ):
-    """Returns the set of users (logins) that are members of a target access
-    string. The caller must provide a valid 'query key' - the one we've been
+    """Returns the users that are members of a target access string, both as a
+    set of logins ('users') and as a list of members with their names
+    ('members'). The caller must provide a valid 'query key' - the one we've been
     configured with.
 
     Unlike /target-access/{username} this is not cached - every call results
@@ -543,12 +568,12 @@ def get_taa_tas_users(
         )
     code, proposal_number, visit_number = tas_parts
 
-    user_set: set[str] | None = _get_users_from_remote_ispyb(
+    members: list[TargetAccessTasMember] | None = _get_users_from_remote_ispyb(
         code=code,
         proposal_number=proposal_number,
         visit_number=visit_number,
     )
-    if user_set is None:
+    if members is None:
         # An ISPyB failure. We deliberately do not return an empty set here -
         # the caller must be able to tell "nobody" from "we do not know".
         raise HTTPException(
@@ -556,13 +581,14 @@ def get_taa_tas_users(
             detail="Unable to get users from ISPyB",
         )
 
-    count: int = len(user_set)
+    count: int = len(members)
     user: str = "user" if count == 1 else "users"
     _LOGGER.debug("Returning %s %s for '%s'", count, user, tas)
 
     return TargetAccessGetTasUsersResponse(
         count=count,
-        users=user_set,
+        users={member.login for member in members},
+        members=members,
     )
 
 
